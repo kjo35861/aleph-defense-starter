@@ -1,3 +1,4 @@
+// Step 2 self-check: static notes must be empty; /api/notes remains intentionally public.
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {

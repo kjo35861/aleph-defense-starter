@@ -1,3 +1,4 @@
+// Step 2: server-only Supabase access. Do not expose environment values.
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(_request, response) {
