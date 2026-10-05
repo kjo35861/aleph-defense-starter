@@ -23,7 +23,6 @@ if (config.step === 1) {
   console.log('1단계 실습용 공개 자료를 public/data.json에 복사했습니다.');
 } else {
   const publicData = {
-    sampleMarker: config.sampleMarker ?? null,
     notes: [],
   };
   await writeFile(output, JSON.stringify(publicData, null, 2) + '\n', 'utf8');
