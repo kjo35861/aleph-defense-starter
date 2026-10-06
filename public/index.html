@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Step 2: note bodies come from /api/notes, not static files. -->
+<!-- Step 3: Supabase Auth UI added. Notes API is still public until a later step protects it. -->
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -11,8 +11,17 @@
     main { max-width: 760px; margin: 0 auto; padding: 44px 22px 64px; }
     .eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
     h1 { margin: 16px 0; font-size: clamp(30px, 7vw, 48px); line-height: 1.2; }
+    h2 { margin: 0 0 14px; font-size: 22px; }
     p { font-size: 17px; line-height: 1.7; color: #bfd0e5; }
     .notice { margin: 26px 0; padding: 18px; border: 1px solid #d07384; border-radius: 14px; color: #ffe3e8; background: #612a3544; }
+    .auth { margin: 26px 0; padding: 20px; border: 1px solid #51667c; border-radius: 14px; background: #162438; }
+    .auth form { display: grid; gap: 12px; }
+    .auth label { display: grid; gap: 6px; color: #dce9f8; font-weight: 700; }
+    .auth input { box-sizing: border-box; width: 100%; padding: 11px 12px; border: 1px solid #60758b; border-radius: 9px; background: #0f1a28; color: #f4f8ff; }
+    .auth button { width: fit-content; padding: 10px 16px; border: 0; border-radius: 9px; cursor: pointer; font-weight: 700; }
+    .auth-status { margin: 0 0 14px; color: #bfd0e5; }
+    .auth-error { min-height: 1.4em; margin: 10px 0 0; color: #ffadb9; }
+    [hidden] { display: none !important; }
     ul { list-style: none; display: grid; gap: 12px; padding: 0; }
     li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
     strong { display: block; font-size: 18px; margin-bottom: 5px; }
@@ -21,14 +30,102 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 2단계 자료 이동</div>
+    <div class="eyebrow">BYTE BACK · 3단계 진짜 로그인</div>
     <h1>내 자료실</h1>
-    <p>가상 자료는 정적 파일이 아니라 서버 함수를 거쳐 학습용 데이터베이스에서 불러옵니다.</p>
-    <div class="notice">정적 /data.json에는 메모가 없지만, 현재 /api/notes 주소 자체는 공개되어 있어 로그인하지 않은 요청도 가상 자료를 받을 수 있습니다. 다음 단계에서 접근 통제를 추가해야 합니다.</div>
+    <p>Supabase Auth의 이메일·비밀번호 로그인과 로그아웃 상태를 화면에서 확인합니다.</p>
+
+    <section class="auth" aria-labelledby="auth-title">
+      <h2 id="auth-title">로그인</h2>
+      <p id="auth-status" class="auth-status">로그인 상태를 확인하는 중입니다.</p>
+
+      <form id="login-form">
+        <label>
+          이메일
+          <input id="email" name="email" type="email" autocomplete="username" required>
+        </label>
+        <label>
+          비밀번호
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit">로그인</button>
+      </form>
+
+      <button id="logout-button" type="button" hidden>로그아웃</button>
+      <p id="auth-error" class="auth-error" role="alert" aria-live="polite"></p>
+    </section>
+
+    <div class="notice">정적 /data.json에는 메모가 없습니다. 현재 /api/notes 주소 자체는 아직 공개되어 있어 로그인 여부와 관계없이 가상 자료를 받을 수 있으며, 이 약점은 다음 제작 단계에서 막아야 합니다.</div>
     <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
   </main>
+
   <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
+
+    const SUPABASE_URL = 'REPLACE_WITH_PROJECT_URL';
+    const SUPABASE_PUBLISHABLE_KEY = 'REPLACE_WITH_PUBLISHABLE_KEY';
+
+    const status = document.querySelector('#auth-status');
+    const errorBox = document.querySelector('#auth-error');
+    const loginForm = document.querySelector('#login-form');
+    const logoutButton = document.querySelector('#logout-button');
+    const emailInput = document.querySelector('#email');
+    const passwordInput = document.querySelector('#password');
     const list = document.querySelector('#notes');
+
+    const authConfigured = !SUPABASE_URL.startsWith('REPLACE_')
+      && !SUPABASE_PUBLISHABLE_KEY.startsWith('REPLACE_');
+
+    let supabase = null;
+
+    function renderAuth(session) {
+      const signedIn = Boolean(session?.user);
+      status.textContent = signedIn
+        ? `로그인됨: ${session.user.email ?? '이메일 확인 불가'}`
+        : '로그아웃 상태입니다.';
+      loginForm.hidden = signedIn;
+      logoutButton.hidden = !signedIn;
+      if (signedIn) {
+        passwordInput.value = '';
+      }
+    }
+
+    if (!authConfigured) {
+      status.textContent = 'Supabase 공개 설정값을 넣어야 로그인을 사용할 수 있습니다.';
+      loginForm.querySelector('button').disabled = true;
+    } else {
+      supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      renderAuth(session);
+
+      supabase.auth.onAuthStateChange((_event, nextSession) => {
+        errorBox.textContent = '';
+        renderAuth(nextSession);
+      });
+
+      loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        errorBox.textContent = '';
+
+        const { error } = await supabase.auth.signInWithPassword({
+          email: emailInput.value.trim(),
+          password: passwordInput.value,
+        });
+
+        if (error) {
+          errorBox.textContent = `로그인 실패: ${error.message}`;
+        }
+      });
+
+      logoutButton.addEventListener('click', async () => {
+        errorBox.textContent = '';
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          errorBox.textContent = `로그아웃 실패: ${error.message}`;
+        }
+      });
+    }
+
     try {
       const response = await fetch('/api/notes', { cache: 'no-store' });
       if (!response.ok) throw new Error('자료를 읽을 수 없습니다.');
