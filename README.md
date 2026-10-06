@@ -14,7 +14,7 @@
 
 가상 메모 네 건은 학습용 Supabase의 `learning_notes` 테이블에 두고, 화면은 Vercel 서버 함수 `/api/notes`를 통해 읽습니다. 서버 함수는 Vercel 환경변수 `SUPABASE_URL`과 서버 전용 `SUPABASE_SECRET_KEY`를 읽으며, 실제 키 값을 브라우저 파일·응답·로그에 넣지 않습니다.
 
-정적 `/data.json`에는 메모가 없습니다. 다만 **현재 `/api/notes` 주소 자체는 공개 상태**이므로 로그인하지 않은 방문자도 이 함수를 직접 요청해 가상 메모를 읽을 수 있습니다. 자료를 코드 밖으로 옮긴 것과 접근 통제를 완료한 것은 다르며, 이 공개 함수는 다음 단계에서 막아야 할 약점입니다.
+정적 `/data.json`에는 메모가 없습니다. **2단계 당시에는 `/api/notes` 주소가 공개 상태**여서 로그인하지 않은 방문자도 가상 메모를 읽을 수 있었고, 이 약점은 3단계에서 로그인 토큰 검증으로 막았습니다.
 
 Supabase 초기 학습 테이블과 가상 메모 네 건은 **1회 실행용 SQL 파일**로 SQL Editor에서 적용합니다. 이 파일에는 가상 메모 본문이 있으므로 GitHub에는 커밋하지 않고, `.gitignore`의 `supabase/step2_learning_notes_once.sql` 경로로만 보관합니다. `owner_id uuid` 컬럼은 준비하되 `auth.users` 외래키는 걸지 않고, RLS를 켠 뒤 `anon`·`authenticated`에는 테이블 권한을 주지 않습니다. 실제 비밀키는 저장소에 넣지 않습니다.
 
@@ -59,7 +59,7 @@ git grep -n -E "실습용 가상 (과제|포트폴리오|리추얼|행정) 기�
 
 - 정적 `data.json` 및 `public/data.json`: 현재 최신 GitHub 파일에서는 메모 배열이 비어 있습니다.
 - 1회 실행 SQL: 가상 메모 초기 적재 문장이 있으므로 Git에 커밋하지 않고 로컬에서만 SQL Editor에 사용합니다.
-- 공개 API: `/api/notes`는 아직 인증 없이 호출 가능한 공개 주소이므로, 비로그인 요청으로 가상 메모를 읽을 수 있는 약점이 남아 있습니다.
+- 2단계 당시 공개 API: `/api/notes`는 비로그인 호출이 가능했지만, 3단계 현재는 로그인 토큰 검증에 실패하면 401로 거부합니다.
 - 과거 노출: 옛 공개 Git 커밋이나 옛 Vercel 배포가 접근 가능한 동안에는 과거의 공개 노출이 해소됐다고 쓰지 않습니다. 현재 정적 파일에서 빠졌다는 사실과 과거 노출의 존속 여부를 별도로 기록합니다.
 
 ## 2단계 저장점
@@ -69,7 +69,7 @@ git grep -n -E "실습용 가상 (과제|포트폴리오|리추얼|행정) 기�
 - 정적 `/data.json`에는 가상 메모 본문이 없고 `notes: []`만 남습니다.
 - 화면은 `/api/notes` 서버 함수를 통해 학습용 Supabase의 가상 메모 네 건을 읽도록 구현되어 있습니다.
 - 서버 함수는 `SUPABASE_URL`, `SUPABASE_SECRET_KEY` 환경변수 이름만 참조하며 비밀값을 브라우저 코드·응답·로그에 넣지 않습니다.
-- `/api/notes` 자체는 아직 공개 주소이므로 비로그인 읽기가 가능한 약점이 남아 있습니다.
+- 이 항목은 2단계 저장 당시의 기록이며, 3단계 현재는 `/api/notes`가 무로그인 요청을 401로 거부합니다.
 - 옛 공개 커밋·옛 배포가 접근 가능한 동안에는 과거 노출이 해소됐다고 기록하지 않습니다.
 
 다시 확인할 때는 Vercel에서 현재 프로젝트를 재배포한 뒤 `/`에서 네 카드, `/data.json`에서 빈 `notes` 배열을 확인합니다. GitHub 최신 파일은 `git pull` 후 README의 “2단계 노출 확인 절차”에 따라 검색합니다. 실제 Supabase 환경변수 값은 저장소나 문서에 기록하지 않습니다.
@@ -84,5 +84,5 @@ git grep -n -E "실습용 가상 (과제|포트폴리오|리추얼|행정) 기�
 
 Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uuid.sql`을 SQL Editor에서 한 번 실행합니다. 실행 후 Vercel 최신 배포에서 A 계정으로 로그인하여 메모 추가·수정·삭제가 되는지 확인하고, 삭제한 UUID를 다시 GET했을 때 404인지 확인합니다. 로그아웃 또는 시크릿 창에서 `/api/notes`를 직접 요청하면 401이어야 합니다.
 
-현재 설정은 `aleph.config.json`의 `step: 3`, Supabase 로그인 발급자 정보, 그리고 실제 GET·POST·PUT·DELETE 경로를 `allowedRoutes`에 기록합니다. 비밀번호·JWT·서버 전용 키는 Git이나 README에 기록하지 않습니다.
+현재 설정은 `aleph.config.json`의 `step: 3`, Supabase 로그인 발급자 정보, 그리고 실제 GET·POST·PUT·DELETE 경로를 `allowedRoutes`에 기록합니다. `src/attack-check.mjs`도 3단계 기준으로 갱신되어 무로그인 `/api/notes`의 401 거부와 정적 `/data.json` 비노출을 자기점검합니다. 비밀번호·JWT·서버 전용 키는 Git이나 README에 기록하지 않습니다.
 
