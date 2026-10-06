@@ -1,8 +1,7 @@
-// Step 2 self-check: static notes must be empty; /api/notes remains intentionally public.
-// The student changes this check as each stage adds an attack to the same app.
+// Step 3 self-check: anonymous note API access must be denied and static data must stay empty.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step !== 2) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 3) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
 
   let app;
   try {
@@ -15,7 +14,7 @@ export async function runAttackChecks(config) {
     throw new Error('aleph.config.json의 실제 배포 주소를 먼저 넣어 주세요.');
   }
 
-  const checkJson = async (path) => {
+  const request = async (path) => {
     try {
       const response = await fetch(new URL(path, app), {
         redirect: 'error',
@@ -23,41 +22,35 @@ export async function runAttackChecks(config) {
         headers: { accept: 'application/json' },
       });
       let body = null;
-      if (response.ok) {
-        try {
-          body = await response.json();
-        } catch {
-          // Non-JSON is recorded as an observed failure below.
-        }
-      }
-      return { status: response.status, ok: response.ok, body };
+      try { body = await response.json(); } catch {}
+      return { status: response.status, body };
     } catch (error) {
-      return { status: null, ok: false, body: null, error: error?.name || 'fetch_error' };
+      return { status: null, error: error?.name || 'fetch_error' };
     }
   };
 
-  const staticData = await checkJson('/data.json');
-  const staticEmpty = staticData.ok && Array.isArray(staticData.body?.notes)
+  const staticData = await request('/data.json');
+  const staticEmpty = staticData.status === 200
+    && Array.isArray(staticData.body?.notes)
     && staticData.body.notes.length === 0;
 
-  const notesApi = await checkJson('/api/notes');
-  const apiCount = notesApi.ok && Array.isArray(notesApi.body?.notes)
-    ? notesApi.body.notes.length : null;
+  const anonymousApi = await request('/api/notes');
+  const anonymousDenied = anonymousApi.status === 401;
 
   return [
     {
       attackId: 'anonymous_static_note_read',
-      expected: '비로그인 /data.json에는 가상 메모 본문이 없어야 함',
+      expected: '비로그인 /data.json에는 메모가 없어야 함',
       observed: staticEmpty
         ? '비로그인 /data.json의 notes 배열이 비어 있음'
-        : `비로그인 /data.json 정적 노출 점검 실패 (${staticData.status ?? staticData.error ?? 'unknown'})`,
+        : `비로그인 /data.json 확인 실패 (HTTP ${staticData.status ?? staticData.error ?? 'unknown'})`,
     },
     {
-      attackId: 'anonymous_notes_api_read',
-      expected: '현재 2단계의 공개 API 약점을 확인',
-      observed: apiCount === null
-        ? `비로그인 /api/notes 확인 불가 (${notesApi.status ?? notesApi.error ?? 'unknown'})`
-        : `비로그인 /api/notes에서 가상 메모 ${apiCount}건 접근 가능`,
+      attackId: 'anonymous_notes_api_denied',
+      expected: '비로그인 /api/notes 요청은 401로 거부되어야 함',
+      observed: anonymousDenied
+        ? '비로그인 /api/notes 요청이 HTTP 401로 거부됨'
+        : `비로그인 /api/notes 거부 확인 실패 (HTTP ${anonymousApi.status ?? anonymousApi.error ?? 'unknown'})`,
     },
   ];
 }
