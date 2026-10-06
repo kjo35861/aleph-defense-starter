@@ -1,7 +1,7 @@
-// Step 3 self-check: anonymous note API access must be denied and static data must stay empty.
+// Step 4 self-check: public checks that need no saved credentials.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step !== 3) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 4) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
 
   let app;
   try {
@@ -14,43 +14,56 @@ export async function runAttackChecks(config) {
     throw new Error('aleph.config.json의 실제 배포 주소를 먼저 넣어 주세요.');
   }
 
-  const request = async (path) => {
+  const request = async (path, { json = false } = {}) => {
     try {
       const response = await fetch(new URL(path, app), {
         redirect: 'error',
         signal: AbortSignal.timeout(10000),
-        headers: { accept: 'application/json' },
+        headers: json ? { accept: 'application/json' } : {},
       });
       let body = null;
-      try { body = await response.json(); } catch {}
-      return { status: response.status, body };
+      if (json) {
+        try { body = await response.json(); } catch {}
+      }
+      return { status: response.status, headers: response.headers, body };
     } catch (error) {
-      return { status: null, error: error?.name || 'fetch_error' };
+      return { status: null, headers: null, body: null, error: error?.name || 'fetch_error' };
     }
   };
 
-  const staticData = await request('/data.json');
-  const staticEmpty = staticData.status === 200
-    && Array.isArray(staticData.body?.notes)
-    && staticData.body.notes.length === 0;
+  const anonymousApi = await request('/api/notes', { json: true });
+  const anonymousDenied = [401, 403].includes(anonymousApi.status)
+    && typeof anonymousApi.body?.error === 'string'
+    && anonymousApi.body.error.length > 0;
 
-  const anonymousApi = await request('/api/notes');
-  const anonymousDenied = anonymousApi.status === 401;
+  const identity = await request('/aleph.json', { json: true });
+  const identityVisible = identity.status === 200 && identity.body && typeof identity.body === 'object';
+
+  const home = await request('/');
+  const nosniff = home.status === 200
+    && home.headers?.get('x-content-type-options')?.toLowerCase() === 'nosniff';
 
   return [
     {
-      attackId: 'anonymous_static_note_read',
-      expected: '비로그인 /data.json에는 메모가 없어야 함',
-      observed: staticEmpty
-        ? '비로그인 /data.json의 notes 배열이 비어 있음'
-        : `비로그인 /data.json 확인 실패 (HTTP ${staticData.status ?? staticData.error ?? 'unknown'})`,
+      attackId: 'anonymous_notes_api_denied_json',
+      expected: '비로그인 메모 목록 요청은 401 또는 403 JSON 오류로 거부되어야 함',
+      observed: anonymousDenied
+        ? `비로그인 /api/notes가 HTTP ${anonymousApi.status} JSON 오류로 거부됨`
+        : `비로그인 /api/notes 거부 점검 실패 (HTTP ${anonymousApi.status ?? anonymousApi.error ?? 'unknown'})`,
     },
     {
-      attackId: 'anonymous_notes_api_denied',
-      expected: '비로그인 /api/notes 요청은 401로 거부되어야 함',
-      observed: anonymousDenied
-        ? '비로그인 /api/notes 요청이 HTTP 401로 거부됨'
-        : `비로그인 /api/notes 거부 확인 실패 (HTTP ${anonymousApi.status ?? anonymousApi.error ?? 'unknown'})`,
+      attackId: 'deployment_identity_visible',
+      expected: '/aleph.json이 HTTP 200 JSON으로 열려야 함',
+      observed: identityVisible
+        ? '/aleph.json이 HTTP 200 JSON으로 열림'
+        : `/aleph.json 점검 실패 (HTTP ${identity.status ?? identity.error ?? 'unknown'})`,
+    },
+    {
+      attackId: 'home_nosniff_header',
+      expected: '첫 화면 응답에 X-Content-Type-Options: nosniff가 있어야 함',
+      observed: nosniff
+        ? '첫 화면 응답에서 X-Content-Type-Options: nosniff 확인'
+        : `첫 화면 보안 헤더 점검 실패 (HTTP ${home.status ?? home.error ?? 'unknown'})`,
     },
   ];
 }

@@ -86,3 +86,14 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 
 현재 설정은 `aleph.config.json`의 `step: 3`, Supabase 로그인 발급자 정보, 그리고 실제 GET·POST·PUT·DELETE 경로를 `allowedRoutes`에 기록합니다. `src/attack-check.mjs`도 3단계 기준으로 갱신되어 무로그인 `/api/notes`의 401 거부와 정적 `/data.json` 비노출을 자기점검합니다. 비밀번호·JWT·서버 전용 키는 Git이나 README에 기록하지 않습니다. 또한 최신 `vercel.json`은 첫 화면 `/` 응답에 `X-Content-Type-Options: nosniff` 보안 헤더를 추가해 2단계·3단계의 보안 헤더 가점 조건을 충족하도록 구성되어 있습니다.
 
+## 4단계 저장점 — 로그인해도 내 자료만
+
+자료 API는 `src/verify-login.mjs`가 확인한 사용자 ID를 소유권의 기준으로 사용합니다. 목록 조회는 `owner_id = verified.userId`인 행만 반환하고, 새 메모의 `owner_id`도 서버가 확인한 ID로만 저장합니다. URL이나 요청 본문의 `owner_id`는 신뢰하지 않습니다.
+
+한 건 `GET /api/notes/:id`, `PUT /api/notes/:id`, `DELETE /api/notes/:id`는 DB의 기존 `owner_id`와 검증된 사용자 ID가 일치할 때만 동작합니다. 수정 요청은 `{title,body}` 형식을 유지하고 소유자 변경 입력을 받지 않으며, 다른 사용자의 메모는 존재 여부를 노출하지 않도록 404로 거부합니다.
+
+학습 DB의 `learning_notes`에는 RLS를 켜고 `anon`의 테이블 권한을 제거했습니다. `authenticated`에는 SELECT·INSERT·UPDATE·DELETE만 허용하고, SELECT·DELETE는 `USING (auth.uid() = owner_id)`, INSERT는 `WITH CHECK`, UPDATE는 기존 행 `USING`과 새 행 `WITH CHECK` 모두 같은 소유자 조건을 사용합니다. 이 SQL은 Supabase SQL Editor에서 적용한 DB 설정이며 비밀값은 저장소에 기록하지 않습니다.
+
+`aleph.config.json`은 4단계와 실제 GET·POST·PUT·DELETE 경로를 기록합니다. `src/attack-check.mjs`는 공개 요청으로 확인 가능한 무로그인 메모 목록의 401/403 JSON 거부, `/aleph.json` 접근, 첫 화면의 `X-Content-Type-Options: nosniff`를 자기점검합니다. A/B 교차 소유권 시험은 로그인 자격 증명을 저장소나 제출 묶음에 넣지 않고 앱에서 직접 확인합니다.
+
+다시 확인할 때는 Vercel 최신 배포에서 A와 B가 각자 자기 메모 CRUD를 유지하고 상대 메모 GET·PUT·DELETE가 거부되는지 확인합니다. 시크릿 창의 `GET /api/notes`는 401 또는 403 JSON이어야 하고, `/aleph.json`은 열리며 첫 화면 응답에는 `X-Content-Type-Options: nosniff`가 있어야 합니다.
