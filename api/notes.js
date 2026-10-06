@@ -1,4 +1,4 @@
-// Step 3: authenticated collection API. Ownership enforcement for item routes is deferred to step 4.
+// Step 4: authenticated collection API scoped to the verified owner.
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
@@ -56,7 +56,8 @@ export default async function handler(request, response) {
   if (request.method === 'POST') {
     const payload = parseBody(request);
     const id = payload?.id ?? randomUUID();
-    if (!UUID.test(id) || !validText(payload?.title) || !validText(payload?.body)) {
+    if (!payload || Object.hasOwn(payload, 'owner_id') || !UUID.test(id)
+        || !validText(payload.title) || !validText(payload.body)) {
       return response.status(400).json({ error: 'INVALID_NOTE' });
     }
 

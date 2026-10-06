@@ -1,4 +1,4 @@
-// Step 3: authenticated item API. Intentionally no owner_id predicate until step 4.
+// Step 4: authenticated item API enforcing verified owner on every operation.
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../../src/verify-login.mjs';
@@ -45,11 +45,24 @@ export default async function handler(request, response) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  // Read ownership from the DB, not URL parameters or request body.
+  const { data: existing, error: lookupError } = await supabase
+    .from('learning_notes')
+    .select('id,owner_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (lookupError) return response.status(500).json({ error: 'NOTE_READ_FAILED' });
+  // 404 does not disclose whether a note belongs to someone else.
+  if (!existing || existing.owner_id !== verified.userId) {
+    return response.status(404).json({ error: 'NOT_FOUND' });
+  }
+
   if (request.method === 'GET') {
     const { data, error } = await supabase
       .from('learning_notes')
       .select('id,title,content')
       .eq('id', id)
+      .eq('owner_id', verified.userId)
       .maybeSingle();
     if (error) return response.status(500).json({ error: 'NOTE_READ_FAILED' });
     if (!data) return response.status(404).json({ error: 'NOT_FOUND' });
@@ -58,13 +71,15 @@ export default async function handler(request, response) {
 
   if (request.method === 'PUT') {
     const payload = parseBody(request);
-    if (!validText(payload?.title) || !validText(payload?.body)) {
+    if (!payload || Object.hasOwn(payload, 'owner_id')
+        || !validText(payload.title) || !validText(payload.body)) {
       return response.status(400).json({ error: 'INVALID_NOTE' });
     }
     const { data, error } = await supabase
       .from('learning_notes')
       .update({ title: payload.title.trim(), content: payload.body })
       .eq('id', id)
+      .eq('owner_id', verified.userId)
       .select('id,title,content')
       .maybeSingle();
     if (error) return response.status(500).json({ error: 'NOTE_UPDATE_FAILED' });
@@ -77,6 +92,7 @@ export default async function handler(request, response) {
       .from('learning_notes')
       .delete()
       .eq('id', id)
+      .eq('owner_id', verified.userId)
       .select('id')
       .maybeSingle();
     if (error) return response.status(500).json({ error: 'NOTE_DELETE_FAILED' });
