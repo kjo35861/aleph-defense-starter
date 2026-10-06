@@ -74,3 +74,15 @@ git grep -n -E "실습용 가상 (과제|포트폴리오|리추얼|행정) 기�
 
 다시 확인할 때는 Vercel에서 현재 프로젝트를 재배포한 뒤 `/`에서 네 카드, `/data.json`에서 빈 `notes` 배열을 확인합니다. GitHub 최신 파일은 `git pull` 후 README의 “2단계 노출 확인 절차”에 따라 검색합니다. 실제 Supabase 환경변수 값은 저장소나 문서에 기록하지 않습니다.
 
+## 3단계 저장점 — 진짜 로그인과 메모 CRUD
+
+현재 자료 API는 `src/verify-login.mjs`로 Bearer 토큰을 검사하고, 토큰이 없거나 검증에 실패하면 자료 없이 401로 거부합니다. 브라우저가 임의로 보낸 `userId`나 `role`은 신뢰하지 않으며, 서버가 검증한 사용자 ID만 사용합니다.
+
+로그인한 사용자는 `GET /api/notes`, `POST /api/notes`로 자신의 메모 목록을 읽고 새 메모를 추가할 수 있습니다. 새 메모의 `owner_id`는 서버가 확인한 사용자 ID로 저장합니다. 한 건 조회·수정·삭제는 `GET /api/notes/:id`, `PUT /api/notes/:id`, `DELETE /api/notes/:id`를 사용합니다.
+
+현재 3단계에서는 한 건 경로에 아직 `owner_id` 조건을 걸지 않았습니다. 따라서 로그인한 B가 A 메모의 UUID를 알면 접근할 수 있는 허점이 의도적으로 남아 있으며, 이 소유자 검사는 4단계에서 고칩니다. 무로그인 요청은 허용하지 않습니다.
+
+Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uuid.sql`을 SQL Editor에서 한 번 실행합니다. 실행 후 Vercel 최신 배포에서 A 계정으로 로그인하여 메모 추가·수정·삭제가 되는지 확인하고, 삭제한 UUID를 다시 GET했을 때 404인지 확인합니다. 로그아웃 또는 시크릿 창에서 `/api/notes`를 직접 요청하면 401이어야 합니다.
+
+현재 설정은 `aleph.config.json`의 `step: 3`, Supabase 로그인 발급자 정보, 그리고 실제 GET·POST·PUT·DELETE 경로를 `allowedRoutes`에 기록합니다. 비밀번호·JWT·서버 전용 키는 Git이나 README에 기록하지 않습니다.
+
