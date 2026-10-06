@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Step 3: authenticated CRUD UI; item ownership is intentionally deferred to step 4. -->
+<!-- Step 5: browser talks only to server functions for auth and note data. -->
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -30,7 +30,7 @@
 </head>
 <body>
 <main>
-  <div class="eyebrow">BYTE BACK · 3단계 진짜 로그인</div>
+  <div class="eyebrow">BYTE BACK · 5단계 서버 한곳으로</div>
   <h1>내 자료실</h1>
   <p>로그인한 사용자는 자신의 메모 목록을 보고 메모를 추가·수정·삭제할 수 있습니다.</p>
 
@@ -60,11 +60,6 @@
 </main>
 
 <script type="module">
-  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
-
-  const SUPABASE_URL = 'https://vzyvadaspjwmovtaekdc.supabase.co';
-  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_rjRu2CBVTGELdkwxV1mwtg_GtQ2_xyu';
-  const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
   const status = document.querySelector('#auth-status');
   const authError = document.querySelector('#auth-error');
@@ -80,6 +75,11 @@
   const bodyInput = document.querySelector('#note-body');
   const list = document.querySelector('#notes');
   let session = null;
+
+  const saved = sessionStorage.getItem('byteback_session');
+  if (saved) {
+    try { session = JSON.parse(saved); } catch { sessionStorage.removeItem('byteback_session'); }
+  }
 
   async function api(path, options = {}) {
     if (!session?.access_token) throw new Error('로그인이 필요합니다.');
@@ -168,38 +168,52 @@
     await loadNotes();
   }
 
-  const { data: { session: initialSession } } = await supabase.auth.getSession();
-  await renderAuth(initialSession);
-
-  supabase.auth.onAuthStateChange((_event, nextSession) => {
-    authError.textContent = '';
-    void renderAuth(nextSession);
-  });
+  await renderAuth(session);
 
   signupButton.addEventListener('click', async () => {
     authError.textContent = '';
-    const { data, error } = await supabase.auth.signUp({
-      email: emailInput.value.trim(),
-      password: passwordInput.value,
+    const response = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: emailInput.value.trim(), password: passwordInput.value }),
     });
-    if (error) authError.textContent = `회원가입 실패: ${error.message}`;
-    else if (!data.session) authError.textContent = '회원가입 요청 완료. 이메일 확인이 필요하면 확인 후 로그인하세요.';
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      authError.textContent = `회원가입 실패: ${data.error ?? `HTTP ${response.status}`}`;
+      return;
+    }
+    if (data.accessToken) {
+      session = { access_token: data.accessToken, user: { email: data.email } };
+      sessionStorage.setItem('byteback_session', JSON.stringify(session));
+      await renderAuth(session);
+    } else {
+      authError.textContent = '회원가입 요청 완료. 이메일 확인이 필요하면 확인 후 로그인하세요.';
+    }
   });
 
   loginForm.addEventListener('submit', async event => {
     event.preventDefault();
     authError.textContent = '';
-    const { error } = await supabase.auth.signInWithPassword({
-      email: emailInput.value.trim(),
-      password: passwordInput.value,
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: emailInput.value.trim(), password: passwordInput.value }),
     });
-    if (error) authError.textContent = `로그인 실패: ${error.message}`;
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      authError.textContent = `로그인 실패: ${data.error ?? `HTTP ${response.status}`}`;
+      return;
+    }
+    session = { access_token: data.accessToken, user: { email: data.email } };
+    sessionStorage.setItem('byteback_session', JSON.stringify(session));
+    await renderAuth(session);
   });
 
   logoutButton.addEventListener('click', async () => {
     authError.textContent = '';
-    const { error } = await supabase.auth.signOut();
-    if (error) authError.textContent = `로그아웃 실패: ${error.message}`;
+    session = null;
+    sessionStorage.removeItem('byteback_session');
+    await renderAuth(null);
   });
 
   noteForm.addEventListener('submit', async event => {

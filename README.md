@@ -97,3 +97,13 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 `aleph.config.json`은 4단계와 실제 GET·POST·PUT·DELETE 경로를 기록합니다. `src/attack-check.mjs`는 공개 요청으로 확인 가능한 무로그인 메모 목록의 401/403 JSON 거부, `/aleph.json` 접근, 첫 화면의 `X-Content-Type-Options: nosniff`를 자기점검합니다. A/B 교차 소유권 시험은 로그인 자격 증명을 저장소나 제출 묶음에 넣지 않고 앱에서 직접 확인합니다.
 
 다시 확인할 때는 Vercel 최신 배포에서 A와 B가 각자 자기 메모 CRUD를 유지하고 상대 메모 GET·PUT·DELETE가 거부되는지 확인합니다. 시크릿 창의 `GET /api/notes`는 401 또는 403 JSON이어야 하고, `/aleph.json`은 열리며 첫 화면 응답에는 `X-Content-Type-Options: nosniff`가 있어야 합니다.
+
+## 5단계 저장점 — 자료 요청을 서버 한곳으로
+
+브라우저의 메모 읽기·추가·수정·삭제는 모두 기존 Vercel 서버 함수 `/api/notes`, `/api/notes/:id`를 통해서만 수행합니다. 브라우저 코드에는 Supabase 자료 테이블 직접 호출이 없습니다.
+
+5단계 100점 조건에 맞춰 브라우저의 Supabase SDK와 공개 키도 제거했습니다. 로그인·회원가입은 `/api/auth/login`, `/api/auth/signup` 서버 함수가 처리하고, 서버 함수만 Vercel의 Supabase 환경변수를 읽습니다. 브라우저는 로그인 결과의 접근 토큰만 세션 저장소에 두고 메모 서버 함수의 Bearer 인증에 사용합니다.
+
+`aleph.config.json`은 `step: 5`와 원본 학습 자료 API 주소를 `originalApiUrl`에 기록합니다. 배포 빌드가 만드는 `/aleph.json`에는 실제 `allowedRoutes`와 `originalApiUrl`도 포함합니다. 기존 4단계 소유자 검사와 RLS는 그대로 유지합니다.
+
+다시 확인할 때는 최신 Vercel 배포의 `/aleph.json`에서 `allowedRoutes`가 비어 있지 않은지, 첫 화면 응답에 `X-Content-Type-Options: nosniff`가 있는지, 페이지 소스에 `sb_publishable_` 또는 Supabase 공개 키 상수가 없는지 확인합니다. 로그인 후 자기 메모 CRUD와 상대 메모 거부도 이전 단계와 동일하게 유지되어야 합니다.

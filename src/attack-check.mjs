@@ -1,62 +1,42 @@
-// Step 4 self-check: public checks that need no saved credentials.
-// Never return tokens, private keys, real names, or note bodies.
+// Step 5 self-check: public checks for deployment metadata, security header, and browser key removal.
 export async function runAttackChecks(config) {
-  if (config.step !== 4) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 5) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
 
-  let app;
-  try {
-    app = new URL(config.publicAppUrl);
-  } catch {
-    throw new Error('aleph.config.json의 실제 배포 주소를 먼저 넣어 주세요.');
-  }
-  if (app.protocol !== 'https:' || app.username || app.password || app.search || app.hash
-      || app.pathname !== '/' || app.hostname.endsWith('.example')) {
-    throw new Error('aleph.config.json의 실제 배포 주소를 먼저 넣어 주세요.');
-  }
-
-  const request = async (path, { json = false } = {}) => {
+  const app = new URL(config.publicAppUrl);
+  const request = async (path, json = false) => {
     try {
       const response = await fetch(new URL(path, app), {
         redirect: 'error',
         signal: AbortSignal.timeout(10000),
         headers: json ? { accept: 'application/json' } : {},
       });
+      const text = await response.text();
       let body = null;
       if (json) {
-        try { body = await response.json(); } catch {}
+        try { body = JSON.parse(text); } catch {}
       }
-      return { status: response.status, headers: response.headers, body };
+      return { status: response.status, headers: response.headers, text, body };
     } catch (error) {
-      return { status: null, headers: null, body: null, error: error?.name || 'fetch_error' };
+      return { status: null, headers: null, text: '', body: null, error: error?.name || 'fetch_error' };
     }
   };
 
-  const anonymousApi = await request('/api/notes', { json: true });
-  const anonymousDenied = [401, 403].includes(anonymousApi.status)
-    && typeof anonymousApi.body?.error === 'string'
-    && anonymousApi.body.error.length > 0;
-
-  const identity = await request('/aleph.json', { json: true });
-  const identityVisible = identity.status === 200 && identity.body && typeof identity.body === 'object';
+  const identity = await request('/aleph.json', true);
+  const routesOk = identity.status === 200 && Array.isArray(identity.body?.allowedRoutes)
+    && identity.body.allowedRoutes.length > 0;
 
   const home = await request('/');
   const nosniff = home.status === 200
     && home.headers?.get('x-content-type-options')?.toLowerCase() === 'nosniff';
+  const browserKeyAbsent = !/sb_publishable_|SUPABASE_PUBLISHABLE_KEY|createClient\s*\(/u.test(home.text);
 
   return [
     {
-      attackId: 'anonymous_notes_api_denied_json',
-      expected: '비로그인 메모 목록 요청은 401 또는 403 JSON 오류로 거부되어야 함',
-      observed: anonymousDenied
-        ? `비로그인 /api/notes가 HTTP ${anonymousApi.status} JSON 오류로 거부됨`
-        : `비로그인 /api/notes 거부 점검 실패 (HTTP ${anonymousApi.status ?? anonymousApi.error ?? 'unknown'})`,
-    },
-    {
-      attackId: 'deployment_identity_visible',
-      expected: '/aleph.json이 HTTP 200 JSON으로 열려야 함',
-      observed: identityVisible
-        ? '/aleph.json이 HTTP 200 JSON으로 열림'
-        : `/aleph.json 점검 실패 (HTTP ${identity.status ?? identity.error ?? 'unknown'})`,
+      attackId: 'deployment_allowed_routes',
+      expected: '/aleph.json의 allowedRoutes에 허용 경로가 하나 이상 있어야 함',
+      observed: routesOk
+        ? `/aleph.json allowedRoutes ${identity.body.allowedRoutes.length}개 확인`
+        : `/aleph.json allowedRoutes 점검 실패 (HTTP ${identity.status ?? identity.error ?? 'unknown'})`,
     },
     {
       attackId: 'home_nosniff_header',
@@ -64,6 +44,13 @@ export async function runAttackChecks(config) {
       observed: nosniff
         ? '첫 화면 응답에서 X-Content-Type-Options: nosniff 확인'
         : `첫 화면 보안 헤더 점검 실패 (HTTP ${home.status ?? home.error ?? 'unknown'})`,
+    },
+    {
+      attackId: 'browser_supabase_key_absent',
+      expected: '화면 코드에 Supabase 공개 키나 브라우저 Supabase 클라이언트가 없어야 함',
+      observed: browserKeyAbsent
+        ? '첫 화면 코드에서 Supabase 공개 키와 브라우저 클라이언트 패턴이 없음'
+        : '첫 화면 코드에 Supabase 공개 키 또는 브라우저 클라이언트 패턴이 남아 있음',
     },
   ];
 }
