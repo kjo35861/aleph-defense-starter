@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Step 3: Supabase Auth UI added. Notes API is still public until a later step protects it. -->
+<!-- Step 3: Supabase Auth UI and protected notes API. -->
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -57,8 +57,8 @@
       <p id="auth-error" class="auth-error" role="alert" aria-live="polite"></p>
     </section>
 
-    <div class="notice">정적 /data.json에는 메모가 없습니다. 현재 /api/notes 주소 자체는 아직 공개되어 있어 로그인 여부와 관계없이 가상 자료를 받을 수 있으며, 이 약점은 다음 제작 단계에서 막아야 합니다.</div>
-    <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
+    <div class="notice">정적 /data.json에는 메모가 없습니다. 자료 API는 정상 로그인 토큰을 서버에서 검증한 뒤에만 가상 자료를 반환합니다.</div>
+    <ul id="notes" aria-live="polite"><li>로그인하면 자료를 불러옵니다.</li></ul>
   </main>
 
   <script type="module">
@@ -81,6 +81,38 @@
 
     let supabase = null;
 
+    async function loadNotes(accessToken) {
+      if (!accessToken) {
+        list.replaceChildren(Object.assign(document.createElement('li'), {
+          textContent: '로그인하면 자료를 불러옵니다.',
+        }));
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/notes', {
+          cache: 'no-store',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!response.ok) throw new Error('자료 접근이 거부되었습니다.');
+        const data = await response.json();
+        if (!Array.isArray(data.notes)) throw new Error('자료 형식이 맞지 않습니다.');
+        list.replaceChildren(...data.notes.map(note => {
+          const item = document.createElement('li');
+          const title = document.createElement('strong');
+          const content = document.createElement('span');
+          title.textContent = note.title;
+          content.textContent = note.content;
+          item.append(title, content);
+          return item;
+        }));
+      } catch (error) {
+        const item = document.createElement('li');
+        item.textContent = error.message;
+        list.replaceChildren(item);
+      }
+    }
+
     function renderAuth(session) {
       const signedIn = Boolean(session?.user);
       status.textContent = signedIn
@@ -88,9 +120,8 @@
         : '로그아웃 상태입니다.';
       loginForm.hidden = signedIn;
       logoutButton.hidden = !signedIn;
-      if (signedIn) {
-        passwordInput.value = '';
-      }
+      if (signedIn) passwordInput.value = '';
+      void loadNotes(session?.access_token ?? null);
     }
 
     if (!authConfigured) {
@@ -155,25 +186,6 @@
       });
     }
 
-    try {
-      const response = await fetch('/api/notes', { cache: 'no-store' });
-      if (!response.ok) throw new Error('자료를 읽을 수 없습니다.');
-      const data = await response.json();
-      if (!Array.isArray(data.notes)) throw new Error('자료 형식이 맞지 않습니다.');
-      list.replaceChildren(...data.notes.map(note => {
-        const item = document.createElement('li');
-        const title = document.createElement('strong');
-        const content = document.createElement('span');
-        title.textContent = note.title;
-        content.textContent = note.content;
-        item.append(title, content);
-        return item;
-      }));
-    } catch (error) {
-      const item = document.createElement('li');
-      item.textContent = error.message;
-      list.replaceChildren(item);
-    }
   </script>
 </body>
 </html>
