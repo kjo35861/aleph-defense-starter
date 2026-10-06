@@ -84,5 +84,5 @@ git grep -n -E "실습용 가상 (과제|포트폴리오|리추얼|행정) 기�
 
 Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uuid.sql`을 SQL Editor에서 한 번 실행합니다. 실행 후 Vercel 최신 배포에서 A 계정으로 로그인하여 메모 추가·수정·삭제가 되는지 확인하고, 삭제한 UUID를 다시 GET했을 때 404인지 확인합니다. 로그아웃 또는 시크릿 창에서 `/api/notes`를 직접 요청하면 401이어야 합니다.
 
-현재 설정은 `aleph.config.json`의 `step: 3`, Supabase 로그인 발급자 정보, 그리고 실제 GET·POST·PUT·DELETE 경로를 `allowedRoutes`에 기록합니다. `src/attack-check.mjs`도 3단계 기준으로 갱신되어 무로그인 `/api/notes`의 401 거부와 정적 `/data.json` 비노출을 자기점검합니다. 비밀번호·JWT·서버 전용 키는 Git이나 README에 기록하지 않습니다.
+현재 설정은 `aleph.config.json`의 `step: 3`, Supabase 로그인 발급자 정보, 그리고 실제 GET·POST·PUT·DELETE 경로를 `allowedRoutes`에 기록합니다. `src/attack-check.mjs`도 3단계 기준으로 갱신되어 무로그인 `/api/notes`의 401 거부와 정적 `/data.json` 비노출을 자기점검합니다. 비밀번호·JWT·서버 전용 키는 Git이나 README에 기록하지 않습니다. 또한 최신 `vercel.json`은 첫 화면 `/` 응답에 `X-Content-Type-Options: nosniff` 보안 헤더를 추가해 2단계·3단계의 보안 헤더 가점 조건을 충족하도록 구성되어 있습니다.
 
