@@ -9,8 +9,8 @@ const PATTERNS = new Map(
 );
 
 const NORMAL_TEXT = /(로그인이 성공|로그아웃|세션 유지|자료실 화면|비밀번호 변경이 성공|뒤에 성공)/u;
-const SPRAY_TEXT = /(여러 계정|계정\s*\d+개|서로 다른 계정|같은 비밀번호|계정 이름을 바꿔)/u;
-const BURST_TEXT = /(\d+분 안|1분 안|2분 안|로그인 실패 \d+건|실패가 \d+건|실패 \d+건)/u;
+const SPRAY_TEXT = /(여러 계정|계정\s*\d+개|서로 다른 계정|같은 비밀번호)/u;
+const BURST_TEXT = /(\d+분 안|1분 안|2분 안|로그인 실패 \d+건|실패가 \d+건|실패 \d+건|계정 이름을 바꿔)/u;
 
 function clamp(value) {
   const n = Number(value);
