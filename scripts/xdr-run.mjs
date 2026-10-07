@@ -27,6 +27,13 @@ export async function runXdr({ root, moduleKey, writeError = (line) => console.e
   }
   const loaded = await import(pathToFileURL(join(root, 'xdr', moduleKey, 'decide.mjs')).href);
   if (typeof loaded.decide !== 'function') throw new Error('decide 함수를 내보내지 않았습니다.');
+  let connect = null;
+  try {
+    const connector = await import(pathToFileURL(join(root, 'xdr', moduleKey, 'connect.mjs')).href);
+    if (typeof connector.connect === 'function') connect = connector.connect;
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error;
+  }
 
   const decisions = [];
   const counts = { block: 0, alert: 0, record: 0 };
@@ -47,8 +54,10 @@ export async function runXdr({ root, moduleKey, writeError = (line) => console.e
     } catch {
       writeError(`형식 오류: ${alertId || '(id 없음)'}`);
     }
-    decisions.push({ alertId, action, confidence, reason });
+    const decision = { alertId, action, confidence, reason };
+    decisions.push(decision);
     counts[action] += 1;
+    if (connect) await connect(alert, decision);
   }
 
   const result = { schema: 'aleph.xdr.result.v1', moduleKey, decisions, counts };
