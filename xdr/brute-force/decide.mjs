@@ -40,8 +40,10 @@ function localAssessment(alert) {
     return { kind: 'clear', confidence: 0.95, pattern };
   }
 
-  if (pattern === 'same-source-burst-failures' && level >= 10 && count >= 20) {
-    return { kind: 'clear', confidence: 0.95, pattern };
+  // 설명 문구가 달라도 Wazuh가 T1110으로 태깅했고 규칙 수준이 높으며
+  // 짧은 시간 대량 실패 건수가 확인되면 명확한 brute-force로 본다.
+  if (level >= 10 && count >= 20) {
+    return { kind: 'clear', confidence: 0.95, pattern: 'same-source-burst-failures' };
   }
 
   return { kind: 'ambiguous', confidence: 0.5, pattern: pattern ?? 'no-matching-pattern' };
