@@ -107,3 +107,13 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 `aleph.config.json`은 `step: 5`와 원본 학습 자료 API 주소를 `originalApiUrl`에 기록합니다. 배포 빌드가 만드는 `/aleph.json`에는 실제 `allowedRoutes`와 `originalApiUrl`도 포함합니다. 기존 4단계 소유자 검사와 RLS는 그대로 유지합니다.
 
 다시 확인할 때는 최신 Vercel 배포의 `/aleph.json`에서 `allowedRoutes`가 비어 있지 않은지, 첫 화면 응답에 `X-Content-Type-Options: nosniff`가 있는지, 페이지 소스에 `sb_publishable_` 또는 Supabase 공개 키 상수가 없는지 확인합니다. 로그인 후 자기 메모 CRUD와 상대 메모 거부도 이전 단계와 동일하게 유지되어야 합니다.
+
+## 보너스 xdr-01 저장점 — 무차별 로그인 공격 탐지
+
+`xdr/fixtures/brute-force.json`의 시험 경보를 읽어 필요한 필드만 추출하고, MITRE ATT&CK T1110 근거의 두 패턴과 대조합니다. 명확한 공격은 `block`, 애매한 시도는 `alert`, 정상 이벤트는 `record`로 분류합니다.
+
+`npm run xdr:run -- brute-force` 재실행 결과는 `block 10 / alert 7 / record 11`이며 정상 이벤트를 block 한 경우는 0건입니다. `bf-03`은 같은 비밀번호 근거가 없어 `same-source-burst-failures`로 분류합니다.
+
+`block` 후보는 만료 시각과 근거 경보 번호를 가진 임시 거부 규칙 산출물로 연결하고, `alert` 및 `block` 기록은 `xdr/alerts.log`에 한 줄씩 남깁니다. 현재 ZTNA 판정 요청 계약에는 출발 주소 필드가 없으므로 `src/decider.mjs`에 임의의 IP 필드를 추가하지 않았습니다.
+
+다시 확인하려면 저장소 루트에서 `npm run xdr:run -- brute-force`를 실행하고 `xdr/brute-force/result.json`의 counts와 정상 이벤트 오차단 여부를 확인합니다.
