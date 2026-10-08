@@ -123,3 +123,7 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 다시 확인하려면 저장소 루트에서 `npm run xdr:run -- brute-force`를 실행하고 `xdr/brute-force/result.json`의 counts와 정상 이벤트 오차단 여부를 확인합니다.
 
 회귀 검증 명령은 `node --test test/brute-force-connect.test.mjs test/brute-force-regression.test.mjs test/xdr-run.test.mjs`이며 이번 로컬 실행에서 9개 테스트가 통과했습니다. 심판 화면의 `X01_CLEAR_NOT_BLOCKED` 해결 여부는 수정 커밋 제출 후 다시 확인해야 합니다.
+
+심판의 `XDR_DECIDE_NOT_RUNNING` 보고에 따라 판정기의 `node:fs/promises` 의존성을 제거했습니다. 현재 판정 시에는 JSON 파일을 직접 읽지 않고, 같은 `matchAll` 조건을 담은 순수 JavaScript `patterns.mjs`를 가져옵니다. JSON과 실행용 조건의 일치는 테스트로 검사합니다. `decide.mjs`의 의존 파일은 `patterns.mjs`, `redact.mjs`이며 내장 모듈·npm import가 없습니다. 읽기 모듈과 산출물 생성기는 로컬 실행 도구로서 파일 시스템을 사용합니다.
+
+격리 검사를 포함한 명령은 `node --experimental-vm-modules --test test/brute-force-sandbox.test.mjs test/brute-force-connect.test.mjs test/brute-force-regression.test.mjs test/xdr-run.test.mjs`입니다. 로컬 테스트 11개가 통과했으며, 이 검사는 심판 환경의 완전한 복제가 아닙니다. 새 커밋 재제출로 실제 심판 실행 및 판정 결과를 확인해야 합니다.

@@ -1,12 +1,8 @@
-import { readFile } from 'node:fs/promises';
+import { patterns } from './patterns.mjs';
 import { safeText } from './redact.mjs';
 
-const patternDoc = JSON.parse(
-  await readFile(new URL('./patterns.json', import.meta.url), 'utf8'),
-);
-
 const PATTERNS = new Map(
-  (patternDoc.patterns ?? []).map(pattern => [pattern.name, {
+  patterns.map(pattern => [pattern.name, {
     ...pattern,
     matchers: pattern.matchAll.map(source => new RegExp(source, 'u')),
   }]),
