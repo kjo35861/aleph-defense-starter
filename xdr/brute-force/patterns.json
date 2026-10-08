@@ -4,11 +4,13 @@
   "patterns": [
     {
       "name": "same-source-burst-failures",
+      "matchAll": ["(\\d+분 안|로그인 실패\\s*\\d+건|실패가\\s*\\d+건|실패\\s*\\d+건|계정\\s*\\d+개.*로그인 실패|계정 이름을 바꿔)"],
       "condition": "짧은 시간 안에 같은 출발 주소에서 로그인 실패가 연속으로 다수 발생한다.",
       "evidence": "MITRE ATT&CK T1110 무차별 대입에서 반복적인 인증 실패는 자동화된 비밀번호 추측 시도의 대표 신호다."
     },
     {
       "name": "same-password-multi-account",
+      "matchAll": ["같은 비밀번호", "(여러 계정|계정\\s*\\d+개|서로 다른 계정)"],
       "condition": "같은 출발 주소에서 여러 계정에 같은 비밀번호를 반복 대입한 정황이 나타난다.",
       "evidence": "MITRE ATT&CK T1110의 Password Spraying은 하나의 비밀번호를 여러 계정에 시도하는 형태를 포함한다."
     }

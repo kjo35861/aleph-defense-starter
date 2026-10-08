@@ -1,17 +1,18 @@
 import { readFile } from 'node:fs/promises';
+import { safeText } from './redact.mjs';
 
 const patternDoc = JSON.parse(
   await readFile(new URL('./patterns.json', import.meta.url), 'utf8'),
 );
 
 const PATTERNS = new Map(
-  (patternDoc.patterns ?? []).map(pattern => [pattern.name, pattern]),
+  (patternDoc.patterns ?? []).map(pattern => [pattern.name, {
+    ...pattern,
+    matchers: pattern.matchAll.map(source => new RegExp(source, 'u')),
+  }]),
 );
 
 const NORMAL_TEXT = /(로그인이 성공|로그아웃|세션 유지|자료실 화면|비밀번호 변경이 성공|뒤에 성공)/u;
-const SPRAY_ACCOUNT_TEXT = /(여러 계정|계정\s*\d+개|서로 다른 계정)/u;
-const SAME_PASSWORD_TEXT = /같은 비밀번호/u;
-const BURST_TEXT = /(\d+분 안|1분 안|2분 안|로그인 실패 \d+건|실패가 \d+건|실패 \d+건|계정\s*\d+개.*로그인 실패|계정 이름을 바꿔)/u;
 const JEV_TIMEOUT_MS = 1000;
 
 function clamp(value) {
@@ -22,8 +23,8 @@ function clamp(value) {
 }
 
 function descriptionOf(alert) {
-  if (typeof alert?.description === 'string') return alert.description;
-  if (typeof alert?.rule?.description === 'string') return alert.rule.description;
+  if (typeof alert?.description === 'string') return safeText(alert.description);
+  if (typeof alert?.rule?.description === 'string') return safeText(alert.rule.description);
   return '';
 }
 
@@ -45,17 +46,20 @@ function accountCountOf(alert) {
 }
 
 function bruteForceSignal(alert) {
-  if (Array.isArray(alert?.rule?.mitre)) return alert.rule.mitre.includes('T1110');
+  const mitre = alert?.rule?.mitre;
+  const ids = Array.isArray(mitre) ? mitre : Array.isArray(mitre?.id) ? mitre.id : [];
+  if (ids.some(id => typeof id === 'string' && /^T1110(?:\.\d{3})?$/.test(id))) return true;
   const description = descriptionOf(alert);
   return /(로그인 실패|실패\s*\d+건|실패가\s*\d+건|비밀번호|여러 계정|계정\s*\d+개|계정 이름을 바꿔)/u.test(description);
 }
 
 function matchedPattern(alert) {
   const description = descriptionOf(alert);
-  if (SAME_PASSWORD_TEXT.test(description) && SPRAY_ACCOUNT_TEXT.test(description)) {
-    return 'same-password-multi-account';
+  // 더 구체적인 다중 계정 패턴을 먼저 평가한다.
+  for (const name of ['same-password-multi-account', 'same-source-burst-failures']) {
+    const pattern = PATTERNS.get(name);
+    if (pattern?.matchers.length && pattern.matchers.every(regex => regex.test(description))) return name;
   }
-  if (BURST_TEXT.test(description)) return 'same-source-burst-failures';
   return null;
 }
 
@@ -66,7 +70,7 @@ function localAssessment(alert) {
   const accountCount = accountCountOf(alert);
   const pattern = matchedPattern(alert);
 
-  if (!bruteForceSignal(alert) || NORMAL_TEXT.test(description)) {
+  if (!bruteForceSignal(alert)) {
     return { kind: 'normal', confidence: 0.1, pattern: 'no-matching-pattern' };
   }
 
@@ -78,6 +82,11 @@ function localAssessment(alert) {
   // 짧은 시간 대량 실패 건수가 확인되면 명확한 brute-force로 본다.
   if (level >= 10 && (count >= 20 || accountCount >= 20)) {
     return { kind: 'clear', confidence: 0.95, pattern: 'same-source-burst-failures' };
+  }
+
+  // 뒤따른 로그인 성공만으로 앞선 대량 실패를 정상 처리하지 않는다.
+  if (NORMAL_TEXT.test(description) && count < 20 && accountCount < 20) {
+    return { kind: 'normal', confidence: 0.1, pattern: 'no-matching-pattern' };
   }
 
   return { kind: 'ambiguous', confidence: 0.5, pattern: pattern ?? 'no-matching-pattern' };
@@ -98,9 +107,9 @@ async function askJev(alert, patternName) {
         task: 'brute-force-confidence',
         pattern: patternName,
         alert: {
-          timestamp: alert?.timestamp ?? null,
-          sourceAddress: alert?.sourceAddress ?? alert?.data?.srcip ?? null,
-          account: alert?.account ?? alert?.data?.srcuser ?? null,
+          timestamp: safeText(alert?.timestamp),
+          sourceAddress: safeText(alert?.sourceAddress ?? alert?.data?.srcip),
+          account: safeText(alert?.account ?? alert?.data?.srcuser),
           ruleLevel: alert?.ruleLevel ?? alert?.rule?.level ?? null,
           description: descriptionOf(alert),
         },

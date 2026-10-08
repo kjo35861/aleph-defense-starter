@@ -1,10 +1,8 @@
 import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { safeText } from './redact.mjs';
 
 const DEFAULT_FIXTURE = new URL('../fixtures/brute-force.json', import.meta.url);
-
-function safeText(value) {
-  return typeof value === 'string' ? value : '';
-}
 
 function safeLevel(value) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
@@ -31,7 +29,7 @@ export async function readAlerts(source = DEFAULT_FIXTURE) {
   return rows;
 }
 
-if (process.argv[1] && new URL(`file://${process.argv[1].replaceAll('\\\\', '/')}`).href === import.meta.url) {
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const rows = await readAlerts();
   for (const row of rows) {
     process.stdout.write(`${JSON.stringify(row)}\n`);

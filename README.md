@@ -112,8 +112,14 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 
 `xdr/fixtures/brute-force.json`의 시험 경보를 읽어 필요한 필드만 추출하고, MITRE ATT&CK T1110 근거의 두 패턴과 대조합니다. 명확한 공격은 `block`, 애매한 시도는 `alert`, 정상 이벤트는 `record`로 분류합니다.
 
-`npm run xdr:run -- brute-force` 재실행 결과는 `block 10 / alert 7 / record 11`이며 정상 이벤트를 block 한 경우는 0건입니다. `bf-03`은 같은 비밀번호 근거가 없어 `same-source-burst-failures`로 분류합니다.
+`npm run xdr:run -- brute-force` 로컬 재실행 결과는 28건에 대해 `block 10 / alert 7 / record 11`입니다. 설명상 정상인 `bf-20`~`bf-28` 9건의 block은 0건입니다. 이 로컬 점검은 심판의 비공개 정답이나 운영 정상 요청 통과를 증명하지 않습니다. `bf-03`, `bf-05`는 같은 비밀번호 근거가 없어 `same-source-burst-failures`로 분류합니다.
 
-`block` 후보는 만료 시각과 근거 경보 번호를 가진 임시 거부 규칙 산출물로 연결하고, `alert` 및 `block` 기록은 `xdr/alerts.log`에 한 줄씩 남깁니다. 현재 ZTNA 판정 요청 계약에는 출발 주소 필드가 없으므로 `src/decider.mjs`에 임의의 IP 필드를 추가하지 않았습니다.
+`connect.mjs`는 `block` 중 확신도 0.85 이상, 유효한 IP, 근거 경보 번호가 있는 후보만 `xdr/deny-rules.json`에 씁니다. 만료는 처리 시각부터 15분이며 연결 모듈 호출 시 만료 항목을 정리하고 같은 경보의 재판정 결과로 이전 규칙을 교체·제거합니다. 타이머로 자동 삭제하는 구조는 아닙니다. `alert` 및 `block` 결정은 규칙 생성 여부와 별도로 `xdr/alerts.log`에 JSON 한 줄씩 누적되므로 재실행하면 로그가 추가됩니다. 두 실행 산출물은 Git에서 제외합니다.
+
+실제 ZTNA 연동은 미완료입니다. 저장소에 이 거부 규칙을 읽는 운영 코드가 없고, `src/decider.mjs`는 여전히 모든 요청을 `starter_not_ready`로 거부합니다. 현재 `docs/DECIDER_REQUEST.md` 계약에는 출발 IP 필드가 없어 이를 임의로 추가하지 않았습니다. 운영 차단·만료 해제·정상 요청 통과를 구현하고 검증하려면 엔진이 제공하는 연동 계약이 필요합니다.
+
+읽기 모듈은 다섯 필드를 유지하면서 명시적인 비밀번호·토큰 표기, Bearer, JWT, 일부 키 형식을 `[REDACTED]`로 가립니다. Jev에 전달하는 문자열에도 같은 처리를 적용합니다. 모든 임의의 비밀값을 탐지한다고 보장하지 않습니다. `patterns.json`의 `matchAll`을 실제 설명 매칭에 사용하며, 수치 임계값과 정상 이벤트 판정은 `decide.mjs`에 남아 있습니다. 원본·추출형 경보 반환값 일치, MITRE 하위 기법·누락, 대량 실패 뒤 성공을 회귀 검사합니다. Jev는 선택적 `globalThis.Jev.classify` 훅이고, 무효 응답·예외·1초 시간 초과 시 alert로 처리하며 실제 서비스 연결은 검증하지 않았습니다.
 
 다시 확인하려면 저장소 루트에서 `npm run xdr:run -- brute-force`를 실행하고 `xdr/brute-force/result.json`의 counts와 정상 이벤트 오차단 여부를 확인합니다.
+
+회귀 검증 명령은 `node --test test/brute-force-connect.test.mjs test/brute-force-regression.test.mjs test/xdr-run.test.mjs`이며 이번 로컬 실행에서 9개 테스트가 통과했습니다. 심판 화면의 `X01_CLEAR_NOT_BLOCKED` 해결 여부는 수정 커밋 제출 후 다시 확인해야 합니다.
