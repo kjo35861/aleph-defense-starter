@@ -112,7 +112,7 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 
 `xdr/fixtures/brute-force.json`의 시험 경보를 읽어 필요한 필드만 추출하고, MITRE ATT&CK T1110 근거의 두 패턴과 대조합니다. 명확한 공격은 `block`, 애매한 시도는 `alert`, 정상 이벤트는 `record`로 분류합니다.
 
-`npm run xdr:run -- brute-force` 로컬 재실행 결과는 28건에 대해 `block 10 / alert 7 / record 11`입니다. 설명상 정상인 `bf-20`~`bf-28` 9건의 block은 0건입니다. 이 로컬 점검은 심판의 비공개 정답이나 운영 정상 요청 통과를 증명하지 않습니다. `bf-03`, `bf-05`는 같은 비밀번호 근거가 없어 `same-source-burst-failures`로 분류합니다.
+`npm run xdr:run -- brute-force` 로컬 재실행 결과는 28건에 대해 `block 10 / alert 9 / record 9`입니다. `bf-11`~`bf-19`는 alert, 설명상 정상인 `bf-20`~`bf-28` 9건은 모두 record이며 정상 이벤트의 block은 0건입니다. 반복 실패를 동반한 중간 수준 경보는 이후 로그인에 성공해도 알림으로 남깁니다. 이 로컬 점검은 심판의 비공개 정답이나 운영 정상 요청 통과를 증명하지 않습니다. `bf-03`, `bf-05`는 같은 비밀번호 근거가 없어 `same-source-burst-failures`로 분류합니다.
 
 `connect.mjs`는 `block` 중 확신도 0.85 이상, 유효한 IP, 근거 경보 번호가 있는 후보만 `xdr/deny-rules.json`에 씁니다. 만료는 처리 시각부터 15분이며 연결 모듈 호출 시 만료 항목을 정리하고 같은 경보의 재판정 결과로 이전 규칙을 교체·제거합니다. 타이머로 자동 삭제하는 구조는 아닙니다. `alert` 및 `block` 결정은 규칙 생성 여부와 별도로 `xdr/alerts.log`에 JSON 한 줄씩 누적되므로 재실행하면 로그가 추가됩니다. 두 실행 산출물은 Git에서 제외합니다.
 
@@ -122,8 +122,8 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 
 다시 확인하려면 저장소 루트에서 `npm run xdr:run -- brute-force`를 실행하고 `xdr/brute-force/result.json`의 counts와 정상 이벤트 오차단 여부를 확인합니다.
 
-회귀 검증 명령은 `node --test test/brute-force-connect.test.mjs test/brute-force-regression.test.mjs test/xdr-run.test.mjs`이며 이번 로컬 실행에서 9개 테스트가 통과했습니다. 심판 화면의 `X01_CLEAR_NOT_BLOCKED` 해결 여부는 수정 커밋 제출 후 다시 확인해야 합니다.
+회귀 검증 명령은 `node --test test/brute-force-connect.test.mjs test/brute-force-regression.test.mjs test/xdr-run.test.mjs`입니다. 커밋 b784c59의 심판 결과에서는 실행과 명확한 공격 차단이 통과했고, `X01_AMBIGUOUS_NOT_ALERT`, `X01_RECORD_MISMATCH`가 남았습니다. 이번 수정은 반복 실패 뒤 성공한 경보를 record로 낮추던 조건을 보완하며 재제출로 판정 결과를 확인해야 합니다.
 
 심판의 `XDR_DECIDE_NOT_RUNNING` 보고에 따라 판정기의 `node:fs/promises` 의존성을 제거했습니다. 현재 판정 시에는 JSON 파일을 직접 읽지 않고, 같은 `matchAll` 조건을 담은 순수 JavaScript `patterns.mjs`를 가져옵니다. JSON과 실행용 조건의 일치는 테스트로 검사합니다. `decide.mjs`의 의존 파일은 `patterns.mjs`, `redact.mjs`이며 내장 모듈·npm import가 없습니다. 읽기 모듈과 산출물 생성기는 로컬 실행 도구로서 파일 시스템을 사용합니다.
 
-격리 검사를 포함한 명령은 `node --experimental-vm-modules --test test/brute-force-sandbox.test.mjs test/brute-force-connect.test.mjs test/brute-force-regression.test.mjs test/xdr-run.test.mjs`입니다. 로컬 테스트 11개가 통과했으며, 이 검사는 심판 환경의 완전한 복제가 아닙니다. 새 커밋 재제출로 실제 심판 실행 및 판정 결과를 확인해야 합니다.
+격리 검사를 포함한 명령은 `node --experimental-vm-modules --test test/brute-force-sandbox.test.mjs test/brute-force-connect.test.mjs test/brute-force-regression.test.mjs test/xdr-run.test.mjs`입니다. 로컬 테스트 12개가 통과했으며, 이 검사는 심판 환경의 완전한 복제가 아닙니다. 새 커밋 재제출로 실제 심판 실행 및 판정 결과를 확인해야 합니다.

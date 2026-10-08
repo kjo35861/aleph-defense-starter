@@ -64,9 +64,9 @@
     },
     {
       "alertId": "bf-11",
-      "action": "record",
-      "confidence": 0.1,
-      "reason": "no-matching-pattern"
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "same-source-burst-failures"
     },
     {
       "alertId": "bf-12",
@@ -100,9 +100,9 @@
     },
     {
       "alertId": "bf-17",
-      "action": "record",
-      "confidence": 0.1,
-      "reason": "no-matching-pattern"
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "same-source-burst-failures"
     },
     {
       "alertId": "bf-18",
@@ -173,7 +173,7 @@
   ],
   "counts": {
     "block": 10,
-    "alert": 7,
-    "record": 11
+    "alert": 9,
+    "record": 9
   }
 }

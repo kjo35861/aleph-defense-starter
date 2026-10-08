@@ -25,6 +25,17 @@ test('약한 실패 신호는 태그가 없어도 알림을 유지한다', async
   assert.equal((await decide(alert([], '같은 주소에서 로그인 실패 6건이 있습니다.', '6', 6))).action, 'alert');
 });
 
+test('중간 수준 반복 실패 뒤 성공은 정상 기록으로 낮추지 않는다', async () => {
+  for (const text of [
+    '같은 계정 로그인 실패 4건 뒤에 성공했습니다.',
+    '수업 시작 무렵 로그인 실패 4건 뒤에 성공했습니다.',
+    '로그인 실패 4건이 있고 그 뒤 성공했습니다.',
+  ]) {
+    assert.equal((await decide(alert(['T1110'], text, '4', 6))).action, 'alert');
+    assert.equal((await decide({ ruleLevel: 6, description: text })).action, 'alert');
+  }
+});
+
 test('원본 및 다섯 필드 추출 입력의 모든 반환값이 일치한다', async () => {
   const fixture = JSON.parse(await readFile(new URL('../xdr/fixtures/brute-force.json', import.meta.url), 'utf8'));
   const rows = await readAlerts();

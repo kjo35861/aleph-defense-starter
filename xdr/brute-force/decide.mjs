@@ -80,8 +80,9 @@ function localAssessment(alert) {
     return { kind: 'clear', confidence: 0.95, pattern: 'same-source-burst-failures' };
   }
 
-  // 뒤따른 로그인 성공만으로 앞선 대량 실패를 정상 처리하지 않는다.
-  if (NORMAL_TEXT.test(description) && count < 20 && accountCount < 20) {
+  // 반복 실패를 동반한 중간 수준 경보는 이후 성공해도 알림으로 남긴다.
+  const repeatedFailures = count > 1 && level > 3;
+  if (NORMAL_TEXT.test(description) && !repeatedFailures && count < 20 && accountCount < 20) {
     return { kind: 'normal', confidence: 0.1, pattern: 'no-matching-pattern' };
   }
 
