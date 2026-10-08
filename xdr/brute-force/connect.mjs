@@ -16,15 +16,17 @@ async function readRules() {
   }
 }
 
-function expiresAt(timestamp) {
-  const base = Date.parse(timestamp);
-  if (!Number.isFinite(base)) return new Date(Date.now() + BLOCK_TTL_MS).toISOString();
-  return new Date(base + BLOCK_TTL_MS).toISOString();
+function expiresAt() {
+  return new Date(Date.now() + BLOCK_TTL_MS).toISOString();
 }
 
 export async function connect(alert, decision) {
-  const alertId = typeof alert?.id === 'string' ? alert.id : '';
-  const sourceAddress = typeof alert?.data?.srcip === 'string' ? alert.data.srcip : '';
+  const alertId = typeof alert?.id === 'string'
+    ? alert.id
+    : typeof alert?.alertId === 'string' ? alert.alertId : '';
+  const sourceAddress = typeof alert?.sourceAddress === 'string'
+    ? alert.sourceAddress
+    : typeof alert?.data?.srcip === 'string' ? alert.data.srcip : '';
   const reason = typeof decision?.reason === 'string' ? decision.reason : 'unknown';
 
   if (decision?.action === 'alert' || decision?.action === 'block') {
@@ -43,7 +45,7 @@ export async function connect(alert, decision) {
   const rule = {
     kind: 'deny_source',
     sourceAddress,
-    expiresAt: expiresAt(alert?.timestamp),
+    expiresAt: expiresAt(),
     evidenceAlertId: alertId,
     reason,
   };
