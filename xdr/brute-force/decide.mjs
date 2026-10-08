@@ -18,21 +18,44 @@ function clamp(value) {
   return Math.max(0, Math.min(1, n));
 }
 
+function descriptionOf(alert) {
+  if (typeof alert?.description === 'string') return alert.description;
+  if (typeof alert?.rule?.description === 'string') return alert.rule.description;
+  return '';
+}
+
+function levelOf(alert) {
+  return Number(alert?.ruleLevel ?? alert?.rule?.level ?? 0);
+}
+
+function countOf(alert) {
+  const direct = Number(alert?.count ?? alert?.data?.count);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+
+  const match = descriptionOf(alert).match(/(?:로그인 실패|실패(?:가)?)\s*(\d+)건/u);
+  return match ? Number(match[1]) : 0;
+}
+
+function bruteForceSignal(alert) {
+  if (Array.isArray(alert?.rule?.mitre)) return alert.rule.mitre.includes('T1110');
+  const description = descriptionOf(alert);
+  return /(로그인 실패|비밀번호|여러 계정|계정 이름을 바꿔)/u.test(description);
+}
+
 function matchedPattern(alert) {
-  const description = typeof alert?.rule?.description === 'string' ? alert.rule.description : '';
+  const description = descriptionOf(alert);
   if (SPRAY_TEXT.test(description)) return 'same-password-multi-account';
   if (BURST_TEXT.test(description)) return 'same-source-burst-failures';
   return null;
 }
 
 function localAssessment(alert) {
-  const description = typeof alert?.rule?.description === 'string' ? alert.rule.description : '';
-  const level = Number(alert?.rule?.level ?? 0);
-  const count = Number(alert?.data?.count ?? 0);
-  const mitre = Array.isArray(alert?.rule?.mitre) ? alert.rule.mitre : [];
+  const description = descriptionOf(alert);
+  const level = levelOf(alert);
+  const count = countOf(alert);
   const pattern = matchedPattern(alert);
 
-  if (!mitre.includes('T1110') || NORMAL_TEXT.test(description)) {
+  if (!bruteForceSignal(alert) || NORMAL_TEXT.test(description)) {
     return { kind: 'normal', confidence: 0.1, pattern: 'no-matching-pattern' };
   }
 
@@ -59,10 +82,10 @@ async function askJev(alert, patternName) {
       pattern: patternName,
       alert: {
         timestamp: alert?.timestamp ?? null,
-        sourceAddress: alert?.data?.srcip ?? null,
-        account: alert?.data?.srcuser ?? null,
-        ruleLevel: alert?.rule?.level ?? null,
-        description: alert?.rule?.description ?? null,
+        sourceAddress: alert?.sourceAddress ?? alert?.data?.srcip ?? null,
+        account: alert?.account ?? alert?.data?.srcuser ?? null,
+        ruleLevel: alert?.ruleLevel ?? alert?.rule?.level ?? null,
+        description: descriptionOf(alert),
       },
     });
     return clamp(response?.confidence);
