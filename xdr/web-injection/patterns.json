@@ -1,0 +1,21 @@
+{
+  "schema": "aleph.xdr.web-injection.patterns.v1",
+  "mitre": "T1190",
+  "patterns": [
+    {
+      "name": "repeated-sql-syntax",
+      "condition": "같은 출발 주소의 요청 인자에서 SQL 구문 표기가 짧은 시간 동안 반복된다.",
+      "evidence": "MITRE ATT&CK T1190은 외부 공개 애플리케이션의 취약점 악용을 다루며, 요청 인자에 반복되는 SQL 구문은 SQL 주입 시도의 근거다."
+    },
+    {
+      "name": "repeated-script-tag",
+      "condition": "같은 출발 주소의 요청 인자에서 스크립트 태그 또는 스크립트 삽입 표기가 짧은 시간 동안 반복된다.",
+      "evidence": "MITRE ATT&CK T1190은 외부 공개 애플리케이션의 취약점 악용을 다루며, 요청 인자에 반복되는 스크립트 태그는 스크립트 주입 시도의 근거다."
+    },
+    {
+      "name": "repeated-path-traversal",
+      "condition": "같은 출발 주소의 요청 인자에서 ../처럼 상위 경로로 거슬러 올라가는 표기가 짧은 시간 동안 반복된다.",
+      "evidence": "MITRE ATT&CK T1190은 외부 공개 애플리케이션의 취약점 악용을 다루며, 요청 인자에 반복되는 상위 경로 표기는 경로 순회 시도의 근거다."
+    }
+  ]
+}
