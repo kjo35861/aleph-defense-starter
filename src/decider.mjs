@@ -76,7 +76,7 @@ function exactResource(input) {
     return null;
   }
 
-  const { method, route, path, service } = request;
+  const { method, route, path, service } = input;
   if (typeof method !== 'string' || typeof route !== 'string'
       || typeof path !== 'string' || typeof service !== 'string') {
     return null;
@@ -122,7 +122,7 @@ function recentStepUp(input) {
 function respond(input, decision, reasonCode, ruleId) {
   return {
     schema: 'aleph.decision.v1',
-    requestId: request.requestId,
+    requestId: input.requestId,
     decision,
     reasonCode,
     ruleIds: [ruleId],
