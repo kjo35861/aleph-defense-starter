@@ -1,7 +1,7 @@
 {
   "schema": "aleph.policy.verified.v1",
-  "verifiedCommit": "1251c6d9fb1cf39fc2b059a987d9065a1e27a839",
-  "label": "fix: normalize stage 9 detection input",
+  "verifiedCommit": "8ea42140a7a6c0968121326cc455f6af1e186ee4",
+  "label": "docs: record stage 9 checkpoint",
   "files": {
     "api/notes.js": "07db32424f34860e04bce1d0bbadcee1de9613b7",
     "api/notes/[id].js": "40992f65db1321b0569ce2d1e251417a2ef890f3",
