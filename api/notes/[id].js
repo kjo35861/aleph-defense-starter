@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../../src/verify-login.mjs';
+import { RESOURCE_IDS } from '../../src/resource-id.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -30,6 +31,7 @@ function noteResponse(row) {
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('X-Aleph-Resource-Id', RESOURCE_IDS.notes);
 
   const url = process.env.SUPABASE_URL;
   const secretKey = process.env.SUPABASE_SECRET_KEY;
@@ -54,7 +56,7 @@ export default async function handler(request, response) {
   if (lookupError) return response.status(500).json({ error: 'NOTE_READ_FAILED' });
   // 404 does not disclose whether a note belongs to someone else.
   if (!existing || existing.owner_id !== verified.userId) {
-    return response.status(404).json({ error: 'NOT_FOUND' });
+    return response.status(404).json({ error: 'WRONG_ZONE' });
   }
 
   if (request.method === 'GET') {
@@ -71,7 +73,7 @@ export default async function handler(request, response) {
 
   if (request.method === 'PUT') {
     const payload = parseBody(request);
-    if (!payload || Object.hasOwn(payload, 'owner_id')
+    if (!payload || Object.hasOwn(payload, 'owner_id') || Object.hasOwn(payload, 'role')
         || !validText(payload.title) || !validText(payload.body)) {
       return response.status(400).json({ error: 'INVALID_NOTE' });
     }

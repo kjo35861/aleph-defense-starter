@@ -1,8 +1,8 @@
 import { decide } from './decider.mjs';
 
-// Step 7 self-check: keep earlier checks and add composite step-up decision practice.
+// Step 8 self-check: keep earlier checks and add composite step-up decision practice.
 export async function runAttackChecks(config) {
-  if (config.step !== 7) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 8) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
 
   const app = new URL(config.publicAppUrl);
   const request = async (path, json = false) => {

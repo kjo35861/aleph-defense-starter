@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
+import { RESOURCE_IDS } from '../src/resource-id.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -27,6 +28,7 @@ function validText(value) {
 
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('X-Aleph-Resource-Id', RESOURCE_IDS.notes);
 
   const url = process.env.SUPABASE_URL;
   const secretKey = process.env.SUPABASE_SECRET_KEY;
@@ -56,8 +58,8 @@ export default async function handler(request, response) {
   if (request.method === 'POST') {
     const payload = parseBody(request);
     const id = payload?.id ?? randomUUID();
-    if (!payload || Object.hasOwn(payload, 'owner_id') || !UUID.test(id)
-        || !validText(payload.title) || !validText(payload.body)) {
+    if (!payload || Object.hasOwn(payload, 'owner_id') || Object.hasOwn(payload, 'role')
+        || !UUID.test(id) || !validText(payload.title) || !validText(payload.body)) {
       return response.status(400).json({ error: 'INVALID_NOTE' });
     }
 
