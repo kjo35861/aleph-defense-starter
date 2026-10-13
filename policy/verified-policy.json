@@ -1,0 +1,12 @@
+{
+  "schema": "aleph.policy.verified.v1",
+  "verifiedCommit": "1251c6d9fb1cf39fc2b059a987d9065a1e27a839",
+  "label": "fix: normalize stage 9 detection input",
+  "files": {
+    "api/notes.js": "07db32424f34860e04bce1d0bbadcee1de9613b7",
+    "api/notes/[id].js": "40992f65db1321b0569ce2d1e251417a2ef890f3",
+    "src/decider.mjs": "d07642f3b6c7ab49afb4c2f4464dfb5714e557bc",
+    "src/detect.mjs": "038db8ba7c323109af1524e376622ab0cc02710e",
+    "src/resource-id.mjs": "720530c74ec4c8bb3d725f18540161a665ea81e9"
+  }
+}
