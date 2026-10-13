@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../../src/verify-login.mjs';
@@ -27,27 +26,6 @@ function parseBody(request) {
   return null;
 }
 
-function contentSha256(title, content) {
-  return createHash('sha256')
-    .update(String(title), 'utf8')
-    .update(Buffer.from([0]))
-    .update(String(content), 'utf8')
-    .digest('hex');
-}
-
-function validBackup(row, id, ownerId) {
-  return row
-    && row.id === id
-    && row.owner_id === ownerId
-    && typeof row.title === 'string'
-    && row.title.trim().length > 0
-    && row.title.length <= 5000
-    && typeof row.content === 'string'
-    && row.content.length <= 5000
-    && SHA256.test(row.content_sha256 ?? '')
-    && contentSha256(row.title, row.content) === row.content_sha256;
-}
-
 export default async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
   response.setHeader('X-Aleph-Resource-Id', RESOURCE_IDS.notes);
@@ -68,104 +46,45 @@ export default async function handler(request, response) {
   if (!payload || Object.keys(payload).sort().join(',') !== 'id' || !UUID.test(payload.id ?? '')) {
     return response.status(400).json({ error: 'INVALID_NOTE_ID' });
   }
-  const id = payload.id.toLowerCase();
 
+  const id = payload.id.toLowerCase();
   const supabase = createClient(url, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // 비공개 사본에서 로그인한 본인의 지정 ID 한 건만 읽습니다.
-  const { data: backup, error: backupError } = await supabase
-    .from('learning_notes_backup')
-    .select('id,owner_id,title,content,content_sha256')
-    .eq('id', id)
-    .eq('owner_id', verified.userId)
-    .maybeSingle();
+  // DB 함수가 같은 트랜잭션 안에서 비공개 사본을 다시 읽어 잠그고,
+  // ID·소유자·내용 해시 검증에 성공한 경우에만 지정한 한 건을 복원합니다.
+  const { data, error } = await supabase.rpc('restore_verified_learning_note', {
+    p_note_id: id,
+    p_actor_id: verified.userId,
+  });
 
-  if (backupError) return response.status(500).json({ error: 'BACKUP_READ_FAILED' });
-  if (!backup) return response.status(404).json({ error: 'NOT_FOUND' });
-  if (!validBackup(backup, id, verified.userId)) {
-    return response.status(409).json({ error: 'BACKUP_UNVERIFIED' });
+  if (error) {
+    const message = String(error.message ?? '').toLowerCase();
+    if (message.includes('backup_unverified')) {
+      return response.status(409).json({ error: 'BACKUP_UNVERIFIED' });
+    }
+    if (message.includes('restore_rejected')) {
+      return response.status(404).json({ error: 'NOT_FOUND' });
+    }
+    if (message.includes('restore_mismatch')) {
+      return response.status(500).json({ error: 'RESTORE_MISMATCH' });
+    }
+    if (error.code === '42883' || error.code === 'PGRST202') {
+      return response.status(503).json({ error: 'RESTORE_NOT_CONFIGURED' });
+    }
+    return response.status(500).json({ error: 'NOTE_RESTORE_FAILED' });
   }
 
-  const firstBackupFingerprint = contentSha256(
-    `${backup.id}\0${backup.owner_id}\0${backup.content_sha256}`,
-    `${backup.title}\0${backup.content}`,
-  );
-
-  // 복원 실행 직전에 비공개 사본을 다시 읽습니다. 처음 검증한 사본과 조금이라도 달라졌거나
-  // 두 번째 검증이 실패하면 쓰기 전에 중단합니다.
-  const { data: verifiedBackup, error: verifyBackupError } = await supabase
-    .from('learning_notes_backup')
-    .select('id,owner_id,title,content,content_sha256')
-    .eq('id', id)
-    .eq('owner_id', verified.userId)
-    .maybeSingle();
-  if (verifyBackupError) return response.status(500).json({ error: 'BACKUP_READ_FAILED' });
-  if (!verifiedBackup || !validBackup(verifiedBackup, id, verified.userId)) {
-    return response.status(409).json({ error: 'BACKUP_UNVERIFIED' });
-  }
-  const secondBackupFingerprint = contentSha256(
-    `${verifiedBackup.id}\0${verifiedBackup.owner_id}\0${verifiedBackup.content_sha256}`,
-    `${verifiedBackup.title}\0${verifiedBackup.content}`,
-  );
-  if (secondBackupFingerprint !== firstBackupFingerprint) {
-    return response.status(409).json({ error: 'BACKUP_UNVERIFIED' });
-  }
-
-  // 아래부터는 두 번 검증한 동일 사본만 사용합니다.
-  const safeBackup = verifiedBackup;
-
-  // 같은 ID가 다른 소유자에게 속해 있으면 존재 여부를 넓게 공개하지 않고 복원을 거부합니다.
-  const { data: existing, error: existingError } = await supabase
-    .from('learning_notes')
-    .select('id,owner_id')
-    .eq('id', id)
-    .maybeSingle();
-  if (existingError) return response.status(500).json({ error: 'NOTE_READ_FAILED' });
-  if (existing && existing.owner_id !== verified.userId) {
-    return response.status(404).json({ error: 'NOT_FOUND' });
-  }
-
-  if (existing) {
-    const { error } = await supabase
-      .from('learning_notes')
-      .update({ title: safeBackup.title, content: safeBackup.content })
-      .eq('id', id)
-      .eq('owner_id', verified.userId);
-    if (error) return response.status(500).json({ error: 'NOTE_RESTORE_FAILED' });
-  } else {
-    const { error } = await supabase.from('learning_notes').insert({
-      id,
-      owner_id: verified.userId,
-      title: safeBackup.title,
-      content: safeBackup.content,
-    });
-    if (error?.code === '23505') return response.status(404).json({ error: 'NOT_FOUND' });
-    if (error) return response.status(500).json({ error: 'NOTE_RESTORE_FAILED' });
-  }
-
-  // 복원 직후 대상 한 건만 다시 읽어 ID·소유자·내용 해시를 사본과 재대조합니다.
-  const { data: restored, error: checkError } = await supabase
-    .from('learning_notes')
-    .select('id,owner_id,title,content')
-    .eq('id', id)
-    .eq('owner_id', verified.userId)
-    .maybeSingle();
-  if (checkError) return response.status(500).json({ error: 'RESTORE_CHECK_FAILED' });
-
-  const restoredHash = restored ? contentSha256(restored.title, restored.content) : null;
-  if (!restored
-      || restored.id !== safeBackup.id
-      || restored.owner_id !== safeBackup.owner_id
-      || restoredHash !== safeBackup.content_sha256) {
+  if (!data || data.id !== id || data.restored !== true || data.verified !== true
+      || !SHA256.test(data.contentSha256 ?? '')) {
     return response.status(500).json({ error: 'RESTORE_MISMATCH' });
   }
 
-  // 감사 이력에는 쓰지 않습니다. 서버 로그에도 사용자/메모/본문을 남기지 않습니다.
+  // 사용자/메모 본문/토큰을 로그에 남기지 않고, 감사 기록 테이블도 수정하지 않습니다.
   return response.status(200).json({
-    id: restored.id,
+    id: data.id,
     restored: true,
-    contentSha256: restoredHash,
+    contentSha256: data.contentSha256,
   });
 }
