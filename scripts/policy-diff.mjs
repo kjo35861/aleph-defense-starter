@@ -43,11 +43,14 @@ export function verifySnapshot(snapshotPath = DEFAULT_SNAPSHOT) {
       return stop('invalid', '안전 정책 사본 파일 형식이나 크기가 올바르지 않습니다.');
     }
     const raw = readFileSync(fullPath);
-    const snapshotHash = createHash('sha256').update(raw).digest('hex');
+    // Git의 Windows 체크아웃(CRLF)과 저장소 원본(LF)은 같은 정책 사본으로 봅니다.
+    // 줄바꿈만 정규화하고 JSON 내용 자체가 바뀌면 고정 지문 검증은 실패합니다.
+    const normalizedRaw = raw.toString('utf8').replace(/\r\n/gu, '\n');
+    const snapshotHash = createHash('sha256').update(normalizedRaw, 'utf8').digest('hex');
     if (snapshotHash !== VERIFIED_SNAPSHOT_SHA256) {
       return stop('unverified', '안전 정책 사본 자체의 고정 지문이 침해 전 검증값과 다릅니다.');
     }
-    snapshot = JSON.parse(raw.toString('utf8'));
+    snapshot = JSON.parse(normalizedRaw);
   } catch {
     return stop('invalid', '안전 정책 사본을 읽거나 검증할 수 없습니다.');
   }
