@@ -37,6 +37,7 @@ select
     'hex'
   )
 from public.learning_notes
+where owner_id is not null
 on conflict (id) do nothing;
 
 -- 읽기 전용 검증: hash_mismatch는 0이어야 합니다.
