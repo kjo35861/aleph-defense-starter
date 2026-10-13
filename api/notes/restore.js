@@ -89,8 +89,8 @@ export default async function handler(request, response) {
   }
 
   const firstBackupFingerprint = contentSha256(
-    `${safeBackup.id}\0${safeBackup.owner_id}\0${safeBackup.content_sha256}`,
-    `${safeBackup.title}\0${safeBackup.content}`,
+    `${backup.id}\0${backup.owner_id}\0${backup.content_sha256}`,
+    `${backup.title}\0${backup.content}`,
   );
 
   // 복원 실행 직전에 비공개 사본을 다시 읽습니다. 처음 검증한 사본과 조금이라도 달라졌거나
