@@ -88,6 +88,34 @@ export default async function handler(request, response) {
     return response.status(409).json({ error: 'BACKUP_UNVERIFIED' });
   }
 
+  const firstBackupFingerprint = contentSha256(
+    `${safeBackup.id}\0${safeBackup.owner_id}\0${safeBackup.content_sha256}`,
+    `${safeBackup.title}\0${safeBackup.content}`,
+  );
+
+  // 복원 실행 직전에 비공개 사본을 다시 읽습니다. 처음 검증한 사본과 조금이라도 달라졌거나
+  // 두 번째 검증이 실패하면 쓰기 전에 중단합니다.
+  const { data: verifiedBackup, error: verifyBackupError } = await supabase
+    .from('learning_notes_backup')
+    .select('id,owner_id,title,content,content_sha256')
+    .eq('id', id)
+    .eq('owner_id', verified.userId)
+    .maybeSingle();
+  if (verifyBackupError) return response.status(500).json({ error: 'BACKUP_READ_FAILED' });
+  if (!verifiedBackup || !validBackup(verifiedBackup, id, verified.userId)) {
+    return response.status(409).json({ error: 'BACKUP_UNVERIFIED' });
+  }
+  const secondBackupFingerprint = contentSha256(
+    `${verifiedBackup.id}\0${verifiedBackup.owner_id}\0${verifiedBackup.content_sha256}`,
+    `${verifiedBackup.title}\0${verifiedBackup.content}`,
+  );
+  if (secondBackupFingerprint !== firstBackupFingerprint) {
+    return response.status(409).json({ error: 'BACKUP_UNVERIFIED' });
+  }
+
+  // 아래부터는 두 번 검증한 동일 사본만 사용합니다.
+  const safeBackup = verifiedBackup;
+
   // 같은 ID가 다른 소유자에게 속해 있으면 존재 여부를 넓게 공개하지 않고 복원을 거부합니다.
   const { data: existing, error: existingError } = await supabase
     .from('learning_notes')
@@ -102,7 +130,7 @@ export default async function handler(request, response) {
   if (existing) {
     const { error } = await supabase
       .from('learning_notes')
-      .update({ title: backup.title, content: backup.content })
+      .update({ title: safeBackup.title, content: safeBackup.content })
       .eq('id', id)
       .eq('owner_id', verified.userId);
     if (error) return response.status(500).json({ error: 'NOTE_RESTORE_FAILED' });
@@ -110,8 +138,8 @@ export default async function handler(request, response) {
     const { error } = await supabase.from('learning_notes').insert({
       id,
       owner_id: verified.userId,
-      title: backup.title,
-      content: backup.content,
+      title: safeBackup.title,
+      content: safeBackup.content,
     });
     if (error?.code === '23505') return response.status(404).json({ error: 'NOT_FOUND' });
     if (error) return response.status(500).json({ error: 'NOTE_RESTORE_FAILED' });
@@ -128,9 +156,9 @@ export default async function handler(request, response) {
 
   const restoredHash = restored ? contentSha256(restored.title, restored.content) : null;
   if (!restored
-      || restored.id !== backup.id
-      || restored.owner_id !== backup.owner_id
-      || restoredHash !== backup.content_sha256) {
+      || restored.id !== safeBackup.id
+      || restored.owner_id !== safeBackup.owner_id
+      || restoredHash !== safeBackup.content_sha256) {
     return response.status(500).json({ error: 'RESTORE_MISMATCH' });
   }
 
