@@ -10,7 +10,8 @@ const SCHEMA = 'aleph.policy.verified.v1';
 const COMMIT = /^[0-9a-f]{40}$/u;
 const BLOB = /^[0-9a-f]{40}$/u;
 const MAX_SNAPSHOT_BYTES = 64 * 1024;
-const VERIFIED_SNAPSHOT_SHA256 = 'd985ee8eebf48fe9e2ed08b9c4b3b46ce17900b64fb5173e34f2e0f0ab04a48b';
+const VERIFIED_SNAPSHOT_SHA256 = '1e017e0123aee650efbd0a07e00b0378de77c601738f25421530f5ef3804c0fd';
+const UTC_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
 
 function git(args) {
   return execFileSync('git', ['-C', ROOT, ...args], {
@@ -56,6 +57,10 @@ export function verifySnapshot(snapshotPath = DEFAULT_SNAPSHOT) {
       || !COMMIT.test(snapshot.verifiedCommit ?? '')
       || typeof snapshot.label !== 'string'
       || !snapshot.label.trim()
+      || typeof snapshot.capturedAt !== 'string'
+      || !UTC_TIME.test(snapshot.capturedAt)
+      || typeof snapshot.verifiedAt !== 'string'
+      || !UTC_TIME.test(snapshot.verifiedAt)
       || !plainObject(snapshot.files)
       || !Object.keys(snapshot.files).length
       || Object.entries(snapshot.files).some(([path, blob]) =>
@@ -75,6 +80,14 @@ export function verifySnapshot(snapshotPath = DEFAULT_SNAPSHOT) {
     return stop('unverified', '사본 이름과 기준 커밋 제목이 일치하지 않습니다.');
   }
 
+  const capturedAt = Date.parse(snapshot.capturedAt);
+  const verifiedAt = Date.parse(snapshot.verifiedAt);
+  const checkpointAt = Date.parse(git(['show', '-s', '--format=%cI', snapshot.verifiedCommit]));
+  if (!Number.isFinite(capturedAt) || !Number.isFinite(verifiedAt) || !Number.isFinite(checkpointAt)
+      || capturedAt > verifiedAt || verifiedAt !== checkpointAt) {
+    return stop('unverified', '안전 정책 사본의 사전 검증 시각이 9단계 저장점과 일치하지 않습니다.');
+  }
+
   for (const [path, expectedBlob] of Object.entries(snapshot.files)) {
     let actualBlob;
     try {
@@ -91,6 +104,8 @@ export function verifySnapshot(snapshotPath = DEFAULT_SNAPSHOT) {
     ok: true,
     commit: snapshot.verifiedCommit,
     label: snapshot.label,
+    capturedAt: snapshot.capturedAt,
+    verifiedAt: snapshot.verifiedAt,
     files: Object.keys(snapshot.files).sort(),
   };
 }
@@ -121,7 +136,12 @@ export function inspectPolicy(snapshotPath = DEFAULT_SNAPSHOT) {
 
   return {
     ok: true,
-    version: { commit: verified.commit, label: verified.label },
+    version: {
+      commit: verified.commit,
+      label: verified.label,
+      capturedAt: verified.capturedAt,
+      verifiedAt: verified.verifiedAt,
+    },
     checkedFiles: verified.files,
     changes,
     diff,
@@ -140,6 +160,8 @@ export function formatReport(result) {
   const lines = [
     `복원할 버전: ${result.version.commit.slice(0, 12)} 「${result.version.label}」`,
     `사본 검증: 통과 (정책 파일 ${result.checkedFiles.length}개)`,
+    `사본 시각: ${result.version.capturedAt}`,
+    `검증 시각: ${result.version.verifiedAt}`,
   ];
 
   if (!result.changes.length) {
