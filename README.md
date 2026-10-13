@@ -208,3 +208,5 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 다시 확인할 때는 먼저 `npm run test:recovery`로 정책 사본 정상 검증, 사본 분실·변조 시 fail-closed, 검증 실패 시 정책 파일 쓰기 0건을 확인합니다. 그다음 `npm run policy:diff`로 복원할 버전·사본 시각·검증 시각·변경 범위를 확인하고, 필요한 경우에만 미리보기에서 나온 ID로 `npm run policy:restore -- --confirm <변경세트ID>`를 실행합니다. 정책 복구 뒤에는 `npm run decider:test`와 `npm run detect:test`를 실행하고, 배포 환경에서는 README의 「복구 뒤 1~9단계 재검증 순서」에 따라 A 정상 요청, B의 A 자료 요청 거부, B의 지정 복구 메모 ID·소유자·내용 해시 일치를 확인합니다.
 
 이 저장점 작성 시 실제 A/B 배포 재검증은 기록하지 않았으며, 실행하지 않은 항목은 README 표의 `미실행` 상태를 유지합니다. 로컬 회귀 테스트 결과는 실제 실행한 경우에만 별도로 기록하며 심판 판정으로 간주하지 않습니다.
+
+제출 전 로컬 회귀 검사에서 `npm run test:recovery`를 실행해 4개 테스트가 모두 통과했습니다. 확인 항목은 9단계 정책 사본 시각 검증, 사본 분실·변조 시 fail-closed, 검증 실패 시 정책 파일 쓰기 0건, 복원 미리보기의 버전·검증 시각·변경 범위입니다. 이 결과는 로컬 자기점검이며 심판 판정으로 기록하지 않습니다.
