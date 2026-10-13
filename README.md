@@ -129,11 +129,10 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 격리 검사를 포함한 명령은 `node --experimental-vm-modules --test test/brute-force-sandbox.test.mjs test/brute-force-connect.test.mjs test/brute-force-regression.test.mjs test/xdr-run.test.mjs`입니다. 로컬 테스트 12개가 통과했으며, 이 검사는 심판 환경의 완전한 복제가 아닙니다. 새 커밋 재제출로 실제 심판 실행 및 판정 결과를 확인해야 합니다.
 
 
-## 6단계 등록 기기 판정 확인
+## 6단계 저장점 — 등록 기기만 자료실 읽기 허용
 
-1. 저장소 루트에서 `npm run decider:test`를 실행합니다.
-2. `통과 · 등록 기기의 정상 요청`이 출력되는지 확인합니다.
-3. `통과 · 미등록 기기의 가상 요청`이 출력되는지 확인합니다. 이 가상 요청은 `deny`와 `device_not_registered` 응답을 검사합니다.
-4. 이 명령은 로컬 가상 요청 연습이며 실제 미등록 기기 공격 검증은 심판이 수행합니다.
+현재 판정기는 운영 엔진이 전달한 `deviceRegistered` 값만 사용합니다. 등록 상태가 정확히 `true`인 요청은 `allow / approved`로 허용하고, 미등록이거나 값이 없으면 `deny / device_not_registered`로 거부합니다. 구현된 정책 규칙 ID는 `device_registered` 하나이며 인증서·CA·서명 키를 새로 만들거나 저장소에 넣지 않습니다.
+
+다시 확인하려면 저장소 루트에서 `npm run decider:test`를 실행합니다. 출력에서 `통과 · 등록 기기의 정상 요청`과 `통과 · 미등록 기기의 가상 요청`이 모두 보여야 합니다. 이 명령은 로컬 가상 요청 연습이며 실제 미등록 기기 공격 검증은 심판이 수행합니다.
 
 별도로 설치할 접속 프로그램은 없습니다.

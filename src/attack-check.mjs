@@ -1,6 +1,8 @@
-// Step 5 self-check: public checks for deployment metadata, security header, and browser key removal.
+import { decide } from './decider.mjs';
+
+// Step 6 self-check: keep public deployment checks and add registered-device decision practice.
 export async function runAttackChecks(config) {
-  if (config.step !== 5) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 6) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
 
   const app = new URL(config.publicAppUrl);
   const request = async (path, json = false) => {
@@ -30,6 +32,15 @@ export async function runAttackChecks(config) {
     && home.headers?.get('x-content-type-options')?.toLowerCase() === 'nosniff';
   const browserKeyAbsent = !/sb_publishable_|SUPABASE_PUBLISHABLE_KEY|createClient\s*\(/u.test(home.text);
 
+  const registered = await decide({
+    requestId: 'self-check-registered-device',
+    deviceRegistered: true,
+  });
+  const unregistered = await decide({
+    requestId: 'self-check-unregistered-device',
+    deviceRegistered: false,
+  });
+
   return [
     {
       attackId: 'deployment_allowed_routes',
@@ -51,6 +62,16 @@ export async function runAttackChecks(config) {
       observed: browserKeyAbsent
         ? '첫 화면 코드에서 Supabase 공개 키와 브라우저 클라이언트 패턴이 없음'
         : '첫 화면 코드에 Supabase 공개 키 또는 브라우저 클라이언트 패턴이 남아 있음',
+    },
+    {
+      attackId: 'registered_device_allow',
+      expected: '등록 기기 가상 요청은 allow여야 함',
+      observed: `${registered.decision} / ${registered.reasonCode}`,
+    },
+    {
+      attackId: 'unregistered_device_deny',
+      expected: '미등록 기기 가상 요청은 deny / device_not_registered여야 함',
+      observed: `${unregistered.decision} / ${unregistered.reasonCode}`,
     },
   ];
 }
