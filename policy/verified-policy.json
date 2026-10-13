@@ -2,6 +2,8 @@
   "schema": "aleph.policy.verified.v1",
   "verifiedCommit": "8ea42140a7a6c0968121326cc455f6af1e186ee4",
   "label": "docs: record stage 9 checkpoint",
+  "capturedAt": "2026-10-13T07:29:34.000Z",
+  "verifiedAt": "2026-10-13T07:29:34.000Z",
   "files": {
     "api/notes.js": "07db32424f34860e04bce1d0bbadcee1de9613b7",
     "api/notes/[id].js": "40992f65db1321b0569ce2d1e251417a2ef890f3",
