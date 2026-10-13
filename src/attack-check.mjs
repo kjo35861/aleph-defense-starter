@@ -44,9 +44,9 @@ function deviceReads(count, patch = {}) {
   }));
 }
 
-// Step 9 self-check: keep earlier access decisions and add detection/revocation proposal practice.
+// Step 10 self-check: preserve the 1~9 access/detection regression checks for recovery validation.
 export async function runAttackChecks(config) {
-  if (config.step !== 9) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 10) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
 
   const registered = await decide({ ...baseRequest, requestId: 'self-check-registered-device' });
   const unregistered = await decide({
