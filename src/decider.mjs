@@ -31,33 +31,48 @@ function inspectEngineInput(request) {
   const signals = request?.signals && typeof request.signals === 'object'
     && !Array.isArray(request.signals) ? request.signals : null;
   const source = typeof signals?.source === 'string' ? signals.source : null;
-
   const provenance = source === 'judge_fixture'
     ? 'judge_fixture'
     : source === 'none'
       ? 'none'
       : 'unknown';
 
-  return {
+  // 원본 요청 전체를 보관하지 않고 판정에 필요한 계약 필드만 새 객체로 복사합니다.
+  // body, headers, Authorization/token, 이메일·실명·메모 본문 같은 값은 읽지 않습니다.
+  return Object.freeze({
+    requestId: typeof request?.requestId === 'string' ? request.requestId : '',
+    subjectId: typeof request?.subjectId === 'string' ? request.subjectId : '',
+    deviceId: typeof request?.deviceId === 'string' ? request.deviceId : '',
+    service: typeof request?.service === 'string' ? request.service : '',
+    method: typeof request?.method === 'string' ? request.method : '',
+    path: typeof request?.path === 'string' ? request.path : '',
+    route: typeof request?.route === 'string' ? request.route : '',
+    queryLength: Number.isInteger(request?.queryLength) ? request.queryLength : null,
     deviceRegistered: request?.deviceRegistered === true,
     stepUpVerified: request?.stepUp?.verified === true,
     authAgeSeconds: Number.isInteger(request?.stepUp?.authAgeSeconds)
       ? request.stepUp.authAgeSeconds
       : null,
-    accessContext: {
+    accessContext: Object.freeze({
       provenance,
       region: typeof signals?.region === 'string' ? signals.region : null,
       hour: Number.isInteger(signals?.hour) ? signals.hour : null,
       network: typeof signals?.network === 'string' ? signals.network : null,
-      recentEvents: Array.isArray(request?.recentEvents) ? request.recentEvents : null,
-    },
-  };
+      recentEvents: Array.isArray(request?.recentEvents)
+        ? request.recentEvents.map(event => Object.freeze({
+          kind: typeof event?.kind === 'string' ? event.kind : '',
+          ageSeconds: Number.isInteger(event?.ageSeconds) ? event.ageSeconds : null,
+          count: Number.isInteger(event?.count) ? event.count : null,
+        }))
+        : null,
+    }),
+  });
 }
 
-function exactResource(request) {
-  if (typeof request?.subjectId !== 'string' || !SUBJECT_ID.test(request.subjectId)
-      || typeof request?.deviceId !== 'string' || !DEVICE_ID.test(request.deviceId)
-      || request.queryLength !== 0) {
+function exactResource(input) {
+  if (typeof input?.subjectId !== 'string' || !SUBJECT_ID.test(input.subjectId)
+      || typeof input?.deviceId !== 'string' || !DEVICE_ID.test(input.deviceId)
+      || input.queryLength !== 0) {
     return null;
   }
 
@@ -104,7 +119,7 @@ function recentStepUp(input) {
     && input.authAgeSeconds <= 900;
 }
 
-function respond(request, decision, reasonCode, ruleId) {
+function respond(input, decision, reasonCode, ruleId) {
   return {
     schema: 'aleph.decision.v1',
     requestId: request.requestId,
@@ -118,26 +133,26 @@ export async function decide(request) {
   const input = inspectEngineInput(request);
 
   if (!input.deviceRegistered) {
-    return respond(request, 'deny', 'device_not_registered', 'device_registered');
+    return respond(input, 'deny', 'device_not_registered', 'device_registered');
   }
 
-  const resourceRoute = exactResource(request);
+  const resourceRoute = exactResource(input);
   if (!resourceRoute) {
-    return respond(request, 'deny', 'route_not_allowed', 'resource_zone');
+    return respond(input, 'deny', 'route_not_allowed', 'resource_zone');
   }
 
   // 계약에 강사 역할이 없으므로 공지/강사 자료 쓰기는 누구에게도 허용하지 않습니다.
   if (INSTRUCTOR_ONLY.has(resourceRoute)) {
-    return respond(request, 'deny', 'instructor_role_required', 'resource_zone');
+    return respond(input, 'deny', 'instructor_role_required', 'resource_zone');
   }
 
   if (resourceRoute === 'GET /notes/:id' && needsStepUp(input) && !recentStepUp(input)) {
-    return respond(request, 'step_up', 'step_up_required', 'step_up_required');
+    return respond(input, 'step_up', 'step_up_required', 'step_up_required');
   }
 
   if (STUDENT_ALLOWED.has(resourceRoute)) {
-    return respond(request, 'allow', 'approved', 'resource_zone');
+    return respond(input, 'allow', 'approved', 'resource_zone');
   }
 
-  return respond(request, 'deny', 'route_not_allowed', 'resource_zone');
+  return respond(input, 'deny', 'route_not_allowed', 'resource_zone');
 }
