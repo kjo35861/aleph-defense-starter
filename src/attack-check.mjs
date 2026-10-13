@@ -1,8 +1,8 @@
 import { decide } from './decider.mjs';
 
-// Step 6 self-check: keep public deployment checks and add registered-device decision practice.
+// Step 7 self-check: keep earlier checks and add composite step-up decision practice.
 export async function runAttackChecks(config) {
-  if (config.step !== 6) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 7) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
 
   const app = new URL(config.publicAppUrl);
   const request = async (path, json = false) => {
@@ -40,6 +40,20 @@ export async function runAttackChecks(config) {
     requestId: 'self-check-unregistered-device',
     deviceRegistered: false,
   });
+  const suspicious = await decide({
+    requestId: 'self-check-composite-anomaly',
+    deviceRegistered: true,
+    stepUp: { verified: false, authAgeSeconds: null },
+    recentEvents: [{ kind: 'risk_signal', ageSeconds: 60, count: 20 }],
+    signals: { source: 'judge_fixture', region: 'foreign', network: 'unusual', hour: 3 },
+  });
+  const reauthenticated = await decide({
+    requestId: 'self-check-composite-reauthenticated',
+    deviceRegistered: true,
+    stepUp: { verified: true, authAgeSeconds: 60 },
+    recentEvents: [{ kind: 'risk_signal', ageSeconds: 60, count: 20 }],
+    signals: { source: 'judge_fixture', region: 'foreign', network: 'unusual', hour: 3 },
+  });
 
   return [
     {
@@ -72,6 +86,16 @@ export async function runAttackChecks(config) {
       attackId: 'unregistered_device_deny',
       expected: '미등록 기기 가상 요청은 deny / device_not_registered여야 함',
       observed: `${unregistered.decision} / ${unregistered.reasonCode}`,
+    },
+    {
+      attackId: 'composite_anomaly_step_up',
+      expected: '정해진 복합 이상 가상 요청은 step_up / step_up_required여야 함',
+      observed: `${suspicious.decision} / ${suspicious.reasonCode}`,
+    },
+    {
+      attackId: 'composite_reauthenticated_allow',
+      expected: '최근 재인증된 같은 복합 이상 가상 요청은 allow여야 함',
+      observed: `${reauthenticated.decision} / ${reauthenticated.reasonCode}`,
     },
   ];
 }
