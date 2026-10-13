@@ -72,3 +72,62 @@ export function proposeRevocation(detection, verified) {
     },
   };
 }
+
+
+// 9단계 복합 가상 사건 전용 탐지입니다.
+// 기존 detect(events) 계약은 유지하고, 엔진/심판이 확인한 가상 기기 사건만 별도로 읽습니다.
+// 메모 내용·토큰·실명·지역은 읽지 않으며, 같은 사용자·같은 기기의 GET allow 사건만 묶습니다.
+export function detectDeviceEvents(events) {
+  if (!Array.isArray(events)) throw new TypeError('invalid_detection_events');
+
+  const groups = new Map();
+  for (const event of events) {
+    if (!event || typeof event !== 'object' || Array.isArray(event)) continue;
+
+    const subject = event.subjectId;
+    const deviceId = event.deviceId;
+    const at = Date.parse(event.at);
+
+    if (event.source !== 'local_virtual_fixture'
+        || event.method !== 'GET'
+        || event.decision !== 'allow'
+        || typeof subject !== 'string' || !SUBJECT.test(subject)
+        || typeof deviceId !== 'string' || !DEVICE_ID.test(deviceId)
+        || !Number.isFinite(at)
+        || !['usual', 'unusual'].includes(event.network)) {
+      continue;
+    }
+
+    const key = `${subject}:${deviceId}`;
+    const group = groups.get(key) ?? { subject, deviceId, events: [] };
+    group.events.push({ at, unusual: event.network === 'unusual' });
+    groups.set(key, group);
+  }
+
+  for (const { subject, deviceId, events: items } of groups.values()) {
+    items.sort((a, b) => a.at - b.at);
+    let start = 0;
+    let unusualCount = 0;
+
+    for (let end = 0; end < items.length; end += 1) {
+      unusualCount += Number(items[end].unusual);
+
+      while (items[end].at - items[start].at >= WINDOW_MS) {
+        unusualCount -= Number(items[start].unusual);
+        start += 1;
+      }
+
+      // 대량 조회와 평소와 다른 네트워크가 같은 10분 창에 함께 있을 때만 의심으로 봅니다.
+      if (end - start + 1 > LIMIT && unusualCount > 0) {
+        return {
+          action: 'propose_revocation',
+          reasonCode: 'burst_read',
+          subject,
+          deviceId,
+        };
+      }
+    }
+  }
+
+  return { action: 'observe' };
+}
