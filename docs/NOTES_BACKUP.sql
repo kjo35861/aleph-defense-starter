@@ -68,6 +68,147 @@ from pg_class
 where oid = 'public.learning_notes_backup'::regclass;
 
 
+-- 사본 자체와 분리된 검증 기준입니다.
+-- 현재 검증된 백업 5건의 id/owner/hash만 고정합니다.
+create table if not exists public.learning_notes_backup_verification (
+  id uuid primary key,
+  owner_id uuid not null,
+  content_sha256 text not null check (content_sha256 ~ '^[0-9a-f]{64}
+-- 같은 트랜잭션에서 사본과 현재 행을 잠그고, 사본을 다시 읽어 해시를 검증한 뒤 지정한 한 건만 복원합니다.
+create or replace function public.restore_verified_learning_note(
+  p_note_id uuid,
+  p_actor_id uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog, public, extensions
+as $$
+declare
+  b public.learning_notes_backup%rowtype;
+  v public.learning_notes_backup_verification%rowtype;
+  n public.learning_notes%rowtype;
+  restored public.learning_notes%rowtype;
+  calculated_hash text;
+begin
+  if p_note_id is null or p_actor_id is null then
+    raise exception 'restore_rejected';
+  end if;
+
+  -- 복원 직전 비공개 사본과 별도 검증 기준을 모두 다시 읽고 잠급니다.
+  select *
+    into b
+    from public.learning_notes_backup
+   where id = p_note_id
+     and owner_id = p_actor_id
+   for update;
+
+  select *
+    into v
+    from public.learning_notes_backup_verification
+   where id = p_note_id
+     and owner_id = p_actor_id
+   for update;
+
+  if b.id is null or v.id is null then
+    raise exception 'backup_unverified';
+  end if;
+
+  calculated_hash := encode(
+    extensions.digest(
+      convert_to(b.title, 'UTF8') || decode('00', 'hex') || convert_to(b.content, 'UTF8'),
+      'sha256'
+    ),
+    'hex'
+  );
+
+  -- 사본의 ID·소유자·내용 해시가 별도 검증 기준과 모두 같아야 합니다.
+  if b.id is distinct from p_note_id
+     or b.owner_id is distinct from p_actor_id
+     or v.id is distinct from b.id
+     or v.owner_id is distinct from b.owner_id
+     or b.content_sha256 is null
+     or b.content_sha256 !~ '^[0-9a-f]{64}$'
+     or calculated_hash is distinct from b.content_sha256
+     or v.content_sha256 is distinct from b.content_sha256 then
+    raise exception 'backup_unverified';
+  end if;
+
+  select *
+    into n
+    from public.learning_notes
+   where id = p_note_id
+   for update;
+
+  if found and n.owner_id is distinct from p_actor_id then
+    raise exception 'restore_rejected';
+  end if;
+
+  if found then
+    update public.learning_notes
+       set title = b.title,
+           content = b.content
+     where id = p_note_id
+       and owner_id = p_actor_id;
+  else
+    insert into public.learning_notes (id, owner_id, title, content)
+    values (b.id, b.owner_id, b.title, b.content);
+  end if;
+
+  select *
+    into restored
+    from public.learning_notes
+   where id = p_note_id
+     and owner_id = p_actor_id;
+
+  if not found
+     or restored.id is distinct from b.id
+     or restored.owner_id is distinct from b.owner_id
+     or encode(
+       extensions.digest(
+         convert_to(restored.title, 'UTF8') || decode('00', 'hex') || convert_to(restored.content, 'UTF8'),
+         'sha256'
+       ),
+       'hex'
+     ) is distinct from v.content_sha256 then
+    raise exception 'restore_mismatch';
+  end if;
+
+  return jsonb_build_object(
+    'id', restored.id,
+    'restored', true,
+    'verified', true,
+    'contentSha256', v.content_sha256
+  );
+end
+$$;
+
+revoke all on function public.restore_verified_learning_note(uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.restore_verified_learning_note(uuid, uuid)
+  to service_role;
+),
+  verified_at timestamptz not null default now()
+);
+
+alter table public.learning_notes_backup_verification enable row level security;
+revoke all on table public.learning_notes_backup_verification from public, anon, authenticated;
+
+insert into public.learning_notes_backup_verification (id, owner_id, content_sha256)
+select id, owner_id, content_sha256
+from public.learning_notes_backup
+on conflict (id) do nothing;
+
+-- 검증 기준과 백업이 모두 일치해야 합니다.
+select
+  count(*) as verification_rows,
+  count(*) filter (
+    where v.owner_id is distinct from b.owner_id
+       or v.content_sha256 is distinct from b.content_sha256
+  ) as verification_mismatch
+from public.learning_notes_backup_verification v
+join public.learning_notes_backup b using (id);
+
+
 -- 복원 함수: service_role만 실행합니다.
 -- 같은 트랜잭션에서 사본과 현재 행을 잠그고, 사본을 다시 읽어 해시를 검증한 뒤 지정한 한 건만 복원합니다.
 create or replace function public.restore_verified_learning_note(
