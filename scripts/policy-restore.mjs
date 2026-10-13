@@ -60,8 +60,8 @@ function planLines(result, id) {
   return lines;
 }
 
-export function restoreVerifiedPolicy({ confirm = null } = {}) {
-  const result = inspectPolicy();
+export function restoreVerifiedPolicy({ confirm = null, snapshotPath = 'policy/verified-policy.json' } = {}) {
+  const result = inspectPolicy(snapshotPath);
   if (!result.ok) {
     return {
       ok: false,
@@ -91,7 +91,7 @@ export function restoreVerifiedPolicy({ confirm = null } = {}) {
 
   // 확인 직후 안전 사본 파일을 디스크에서 다시 읽어 고정 지문·커밋·파일 지문을 모두 재검증합니다.
   // 검증 실패 시 어떤 정책 파일도 쓰지 않습니다.
-  const fresh = inspectPolicy();
+  const fresh = inspectPolicy(snapshotPath);
   if (!fresh.ok) {
     return { ok: false, applied: false, output: `중단: ${fresh.reason}\n복원하지 않았습니다.\n` };
   }
@@ -111,7 +111,7 @@ export function restoreVerifiedPolicy({ confirm = null } = {}) {
     writeFileSync(resolve(ROOT, path), baseline, { flag: 'w' });
   }
 
-  const after = inspectPolicy();
+  const after = inspectPolicy(snapshotPath);
   if (!after.ok || after.changes.length) {
     return {
       ok: false,
