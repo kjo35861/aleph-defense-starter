@@ -80,6 +80,7 @@ set search_path = pg_catalog, public, extensions
 as $$
 declare
   b public.learning_notes_backup%rowtype;
+  v public.learning_notes_backup_verification%rowtype;
   n public.learning_notes%rowtype;
   restored public.learning_notes%rowtype;
   calculated_hash text;
@@ -88,7 +89,7 @@ begin
     raise exception 'restore_rejected';
   end if;
 
-  -- 실제 복원 직전 비공개 사본을 다시 읽고 잠급니다.
+  -- 복원 직전 비공개 사본과 별도 검증 기준을 모두 다시 읽고 잠급니다.
   select *
     into b
     from public.learning_notes_backup
@@ -96,7 +97,14 @@ begin
      and owner_id = p_actor_id
    for update;
 
-  if not found then
+  select *
+    into v
+    from public.learning_notes_backup_verification
+   where id = p_note_id
+     and owner_id = p_actor_id
+   for update;
+
+  if b.id is null or v.id is null then
     raise exception 'backup_unverified';
   end if;
 
@@ -108,15 +116,18 @@ begin
     'hex'
   );
 
+  -- 사본의 ID·소유자·내용 해시가 별도 검증 기준과 모두 같아야 합니다.
   if b.id is distinct from p_note_id
      or b.owner_id is distinct from p_actor_id
+     or v.id is distinct from b.id
+     or v.owner_id is distinct from b.owner_id
      or b.content_sha256 is null
      or b.content_sha256 !~ '^[0-9a-f]{64}$'
-     or calculated_hash is distinct from b.content_sha256 then
+     or calculated_hash is distinct from b.content_sha256
+     or v.content_sha256 is distinct from b.content_sha256 then
     raise exception 'backup_unverified';
   end if;
 
-  -- 현재 대상 한 건만 잠급니다. 다른 소유자의 같은 ID는 복원하지 않습니다.
   select *
     into n
     from public.learning_notes
@@ -138,7 +149,6 @@ begin
     values (b.id, b.owner_id, b.title, b.content);
   end if;
 
-  -- 같은 트랜잭션에서 복원된 한 건을 다시 읽어 ID·소유자·내용 해시를 재검증합니다.
   select *
     into restored
     from public.learning_notes
@@ -154,7 +164,7 @@ begin
          'sha256'
        ),
        'hex'
-     ) is distinct from b.content_sha256 then
+     ) is distinct from v.content_sha256 then
     raise exception 'restore_mismatch';
   end if;
 
@@ -162,7 +172,7 @@ begin
     'id', restored.id,
     'restored', true,
     'verified', true,
-    'contentSha256', b.content_sha256
+    'contentSha256', v.content_sha256
   );
 end
 $$;
