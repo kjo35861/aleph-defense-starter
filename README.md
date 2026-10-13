@@ -165,3 +165,14 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 회수 제안은 기존 `aleph.decision.v1` 허용·거부 응답과 분리되어 있습니다. `proposeRevocation()`은 탐지된 가명과 엔진이 확인한 `subjectId`가 일치하고 유효한 `deviceId` 한 개가 있을 때만 대상과 `burst_read` 이유 코드를 반환합니다. 실제 회수 API 호출, 기기 권한 변경, 경과 시간 측정은 구현하지 않았으며 운영 심판의 가상 사건 검증 대상으로 남깁니다.
 
 다시 확인하려면 저장소 루트에서 `npm run decider:test`와 `npm run detect:test`를 실행합니다. 이 명령들은 로컬 가상 사건 연습이며 실제 회수나 심판 통과 증거가 아닙니다.
+
+
+## 10단계 — 비공개 메모 사본 한 건 복원
+
+메모 복원 서비스는 기존 자료 서비스의 서버 경로 `POST /api/notes/restore`입니다. 요청 본문은 `{ "id": "<메모 UUID>" }` 한 항목만 받으며, 소유자·제목·본문·해시는 클라이언트 요청에서 받지 않습니다.
+
+비공개 사본은 Supabase의 `public.learning_notes_backup` 테이블에 둡니다. `docs/NOTES_BACKUP.sql`로 테이블을 만들고 침해 시험 전에 사본을 생성하며, `anon`과 `authenticated`의 테이블 권한을 모두 회수하고 RLS를 켭니다. 내용 지문은 `SHA-256(title UTF-8 || 0x00 || content UTF-8)`입니다.
+
+복원 요청은 로그인 검증으로 확인된 사용자 ID와 사본의 `owner_id`, 요청한 `id`, 사본에 저장된 `content_sha256`을 먼저 대조합니다. 검증에 성공한 경우에만 해당 ID 한 건을 업데이트하거나 같은 ID로 다시 만들며 다른 메모와 감사 기록은 수정하지 않습니다. 복원 직후 같은 한 건을 다시 읽어 ID·소유자·내용 해시가 사본과 모두 같은지 확인하고, 성공 응답에는 메모 본문 대신 `id`, `restored: true`, `contentSha256`만 반환합니다.
+
+시험은 **시험 계정 B가 소유한 가상 메모 한 건으로만** 수행합니다. B로 로그인한 상태에서 해당 메모의 사본을 만든 뒤 그 한 건을 변경하거나 삭제하고 `POST /api/notes/restore`에 그 ID만 보내 복원합니다. 성공 후 B의 해당 메모 ID·소유자·내용 해시가 사본과 같은지 확인하고, 다른 메모와 감사 기록이 그대로인지 확인합니다. 실제 B 토큰·사용자 UUID·메모 본문은 README나 Git에 기록하지 않습니다.

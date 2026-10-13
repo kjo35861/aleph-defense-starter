@@ -1,5 +1,5 @@
 {
-  "step": 9,
+  "step": 10,
   "repoUrl": "https://github.com/kjo35861/aleph-defense-starter",
   "publicAppUrl": "https://aleph-defense-starter-xi.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -14,8 +14,9 @@
     "POST /api/notes",
     "GET /api/notes/:id",
     "PUT /api/notes/:id",
-    "DELETE /api/notes/:id"
+    "DELETE /api/notes/:id",
+    "POST /api/notes/restore"
   ],
   "originalApiUrl": "https://vzyvadaspjwmovtaekdc.supabase.co/rest/v1/learning_notes",
-  "restoreRoute": null
+  "restoreRoute": "POST /api/notes/restore"
 }
