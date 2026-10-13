@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -9,6 +10,7 @@ const SCHEMA = 'aleph.policy.verified.v1';
 const COMMIT = /^[0-9a-f]{40}$/u;
 const BLOB = /^[0-9a-f]{40}$/u;
 const MAX_SNAPSHOT_BYTES = 64 * 1024;
+const VERIFIED_SNAPSHOT_SHA256 = 'd985ee8eebf48fe9e2ed08b9c4b3b46ce17900b64fb5173e34f2e0f0ab04a48b';
 
 function git(args) {
   return execFileSync('git', ['-C', ROOT, ...args], {
@@ -39,7 +41,12 @@ export function verifySnapshot(snapshotPath = DEFAULT_SNAPSHOT) {
     if (!info.isFile() || info.size > MAX_SNAPSHOT_BYTES) {
       return stop('invalid', '안전 정책 사본 파일 형식이나 크기가 올바르지 않습니다.');
     }
-    snapshot = JSON.parse(readFileSync(fullPath, 'utf8'));
+    const raw = readFileSync(fullPath);
+    const snapshotHash = createHash('sha256').update(raw).digest('hex');
+    if (snapshotHash !== VERIFIED_SNAPSHOT_SHA256) {
+      return stop('unverified', '안전 정책 사본 자체의 고정 지문이 침해 전 검증값과 다릅니다.');
+    }
+    snapshot = JSON.parse(raw.toString('utf8'));
   } catch {
     return stop('invalid', '안전 정책 사본을 읽거나 검증할 수 없습니다.');
   }
