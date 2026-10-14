@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { RESOURCE_IDS } from '../src/resource-id.mjs';
+import { approvedDevice, requestAuthorization } from '../../src/browser-session.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -34,12 +35,15 @@ export default async function handler(request, response) {
   const secretKey = process.env.SUPABASE_SECRET_KEY;
   if (!url || !secretKey) return response.status(500).json({ error: 'SERVER_NOT_CONFIGURED' });
 
-  const verified = await verifier(secretKey)(request.headers.authorization);
+  const verified = await verifier(secretKey)(requestAuthorization(request));
   if (!verified?.userId) return response.status(401).json({ error: 'UNAUTHORIZED' });
 
   const supabase = createClient(url, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const deviceApproved = await approvedDevice({ request, verified, supabase, secretKey });
+  if (!deviceApproved) return response.status(403).json({ error: 'DEVICE_NOT_APPROVED' });
 
   if (request.method === 'GET') {
     const { data, error } = await supabase
