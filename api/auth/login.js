@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sessionCookie } from '../../src/browser-session.mjs';
 
 function parseBody(request) {
   if (request.body && typeof request.body === 'object') return request.body;
@@ -32,8 +33,9 @@ export default async function handler(request, response) {
     return response.status(401).json({ error: error?.message || 'LOGIN_FAILED' });
   }
 
+  response.setHeader('Set-Cookie', sessionCookie(data.session.access_token));
   return response.status(200).json({
-    accessToken: data.session.access_token,
     email: data.user?.email ?? email,
+    authenticated: true,
   });
 }
