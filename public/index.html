@@ -4,6 +4,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101a28">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/app-icon.svg" type="image/svg+xml">
   <title>BYTE BACK | 자료실</title>
   <style>
     :root { color-scheme: dark; font-family: system-ui,sans-serif; }
@@ -21,6 +24,11 @@
     button { padding:10px 16px; border:0; border-radius:9px; cursor:pointer; font-weight:700; }
     .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
     .error { min-height:1.4em; color:#ffadb9; }
+    .status-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; }
+    .status-card { padding:14px; border:1px solid #51667c; border-radius:12px; background:#101d2d; }
+    .status-card strong { font-size:14px; color:#8ad8df; }
+    .status-card span { display:block; margin-top:6px; color:#ecf4ff; line-height:1.5; }
+    .muted { font-size:14px; color:#9fb3c9; }
     [hidden] { display:none !important; }
     ul { list-style:none; display:grid; gap:12px; padding:0; }
     li { border:1px solid #51667c; border-radius:14px; padding:17px 19px; background:#1a2a3d; }
@@ -30,9 +38,29 @@
 </head>
 <body>
 <main>
-  <div class="eyebrow">BYTE BACK · 5단계 서버 한곳으로</div>
+  <div class="eyebrow">BYTE BACK · 보호된 자료실</div>
   <h1>내 자료실</h1>
   <p>로그인한 사용자는 자신의 메모 목록을 보고 메모를 추가·수정·삭제할 수 있습니다.</p>
+
+  <section class="panel" aria-labelledby="app-status-title">
+    <h2 id="app-status-title">앱 및 기기 상태</h2>
+    <div class="status-grid">
+      <div class="status-card">
+        <strong>설치 상태</strong>
+        <span id="install-status">브라우저 설치 가능 여부를 확인하는 중입니다.</span>
+      </div>
+      <div class="status-card">
+        <strong>기기 승인 상태</strong>
+        <span id="device-status">설치 여부만으로 기기 승인을 판단하지 않습니다. 보호 요청 결과를 기다리는 중입니다.</span>
+      </div>
+      <div class="status-card">
+        <strong>네트워크 상태</strong>
+        <span id="network-status">연결 상태를 확인하는 중입니다.</span>
+      </div>
+    </div>
+    <div class="actions"><button id="install-button" type="button" hidden>앱 설치</button></div>
+    <p class="muted">설치형 웹앱은 화면 접근을 편하게 하는 기능일 뿐입니다. 로그인·기기 승인·자료 접근 정책을 대신하거나 우회하지 않습니다. 오프라인에서는 보호된 자료 요청을 사용할 수 없습니다.</p>
+  </section>
 
   <section class="panel">
     <h2>로그인</h2>
@@ -62,6 +90,10 @@
 <script type="module">
 
   const status = document.querySelector('#auth-status');
+  const installStatus = document.querySelector('#install-status');
+  const deviceStatus = document.querySelector('#device-status');
+  const networkStatus = document.querySelector('#network-status');
+  const installButton = document.querySelector('#install-button');
   const authError = document.querySelector('#auth-error');
   const noteError = document.querySelector('#note-error');
   const loginForm = document.querySelector('#login-form');
@@ -75,6 +107,70 @@
   const bodyInput = document.querySelector('#note-body');
   const list = document.querySelector('#notes');
   let session = null;
+  let installPrompt = null;
+
+  function renderNetworkStatus() {
+    networkStatus.textContent = navigator.onLine
+      ? '온라인 · 보호 요청은 서버에서 다시 판정됩니다.'
+      : '오프라인 · 로그인과 메모 보호 요청을 사용할 수 없습니다.';
+  }
+
+  function renderInstallStatus() {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+    if (standalone) {
+      installStatus.textContent = '설치된 앱 화면으로 실행 중입니다.';
+      installButton.hidden = true;
+      return;
+    }
+    if (installPrompt) {
+      installStatus.textContent = '이 브라우저에서 설치할 수 있습니다.';
+      installButton.hidden = false;
+      return;
+    }
+    installStatus.textContent = '브라우저 메뉴에서 설치할 수 있는지 확인하세요.';
+    installButton.hidden = true;
+  }
+
+  function markProtectedRequest(response) {
+    if (response.ok) {
+      deviceStatus.textContent = '최근 보호 요청: 허용됨. 설치 여부와는 별개이며, 기기 승인 자체는 보호 정책 판정 결과를 따릅니다.';
+      return;
+    }
+    if ([401, 403, 404].includes(response.status)) {
+      deviceStatus.textContent = `최근 보호 요청: 거부됨 (HTTP ${response.status}). 설치 상태와 무관하게 기존 보호 규칙이 적용되었습니다.`;
+      return;
+    }
+    deviceStatus.textContent = `최근 보호 요청 결과: HTTP ${response.status}. 설치 여부로 기기 승인을 판단하지 않습니다.`;
+  }
+
+  renderNetworkStatus();
+  renderInstallStatus();
+  window.addEventListener('online', renderNetworkStatus);
+  window.addEventListener('offline', renderNetworkStatus);
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    installPrompt = event;
+    renderInstallStatus();
+  });
+  window.addEventListener('appinstalled', () => {
+    installPrompt = null;
+    renderInstallStatus();
+  });
+
+  installButton.addEventListener('click', async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => null);
+    installPrompt = null;
+    renderInstallStatus();
+  });
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      networkStatus.textContent = '온라인 상태이지만 오프라인 안내 기능을 등록하지 못했습니다.';
+    });
+  }
 
   const saved = sessionStorage.getItem('byteback_session');
   if (saved) {
@@ -92,6 +188,7 @@
         ...(options.headers ?? {}),
       },
     });
+    markProtectedRequest(response);
     if (response.status === 204) return null;
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
