@@ -103,10 +103,15 @@ function assess(alert) {
     return { confidence: 0.75, pattern: PATTERNS[1].name };
   }
 
-  if (t1190 && (explicitCve || jndiMention || SCAN_TRACE.test(description))) {
-    const pattern = jndiMention
-      ? (/(머리글|header)/iu.test(description) ? PATTERNS[0].name : PATTERNS[1].name)
-      : PATTERNS[2].name;
+  if (t1190 && level >= 5) {
+    let pattern = PATTERNS[2].name;
+    if (/(머리글|header|중괄호)/iu.test(description)) {
+      pattern = PATTERNS[0].name;
+    } else if (jndiMention || /(조회 형태|lookup|인자|주소)/iu.test(description)) {
+      pattern = PATTERNS[1].name;
+    } else if (explicitCve || SCAN_TRACE.test(description) || /(취약점|라이브러리)/u.test(description)) {
+      pattern = PATTERNS[2].name;
+    }
     return { confidence: 0.5, pattern };
   }
 
