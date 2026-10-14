@@ -151,7 +151,6 @@
   let authenticated = false;
   let approved = false;
   let opsSummary = null;
-  const apiObservations = [];
 
   function renderNetworkStatus() {
     networkStatus.textContent = navigator.onLine
@@ -207,22 +206,6 @@
     return { response, data };
   }
 
-  function addApiObservation(method, path, response, data) {
-    const count = method === 'GET' && path === '/api/notes' && Array.isArray(data)
-      ? data.length
-      : null;
-    apiObservations.push({
-      method,
-      path,
-      status: response.status,
-      ok: response.ok,
-      count,
-      at: new Date().toISOString(),
-    });
-    if (apiObservations.length > 12) apiObservations.shift();
-    renderOperations();
-  }
-
   function sourceLabel(value) {
     if (value === 'server_code') return '서버 코드 확인';
     if (value === 'local_self_check_artifact') return '로컬 자기점검 기록 · API 실측 아님';
@@ -239,14 +222,18 @@
     opsRuleCount.textContent = String(opsSummary.policy?.ruleCount ?? 0);
     opsRuleSource.textContent = sourceLabel(opsSummary.policy?.source);
     opsDetectionCount.textContent = String(counts.total ?? 0);
-    opsDetectionSource.textContent = sourceLabel(detection?.source);
+    opsDetectionSource.textContent = detection?.status === 'not_run'
+      ? '미실행 · 실제 서버 탐지 기록 0건'
+      : sourceLabel(detection?.source);
     opsRevocation.textContent = opsSummary.revocation?.status === 'not_run' ? '미실행' : '확인됨';
     opsRevocationSource.textContent = opsSummary.revocation?.reason ?? sourceLabel(opsSummary.revocation?.source);
     opsRecovery.textContent = String(opsSummary.recovery?.version ?? '-').slice(0, 12);
     opsRecoverySource.textContent = opsSummary.recovery?.status === 'not_run'
       ? `${sourceLabel(opsSummary.recovery?.source)} · 실제 복구 미실행`
       : sourceLabel(opsSummary.recovery?.source);
-    opsBreakdown.textContent = `탐지 기록 합계 ${counts.total}건 · block ${counts.block} · alert ${counts.alert} · record ${counts.record}`;
+    opsBreakdown.textContent = detection?.status === 'not_run'
+      ? '탐지 실측 미실행 · 가린 서버 기록 0건'
+      : `탐지 기록 합계 ${counts.total}건 · block ${counts.block} · alert ${counts.alert} · record ${counts.record}`;
 
     const records = Array.isArray(detection?.records) ? detection.records : [];
     opsRedactedRecords.replaceChildren(...records.map(record => {
@@ -255,12 +242,12 @@
       return li;
     }));
 
-    opsApiObservations.replaceChildren(...(apiObservations.length ? apiObservations.map(item => {
+    const evidence = Array.isArray(opsSummary.apiEvidence) ? opsSummary.apiEvidence : [];
+    opsApiObservations.replaceChildren(...(evidence.length ? evidence.map(item => {
       const li = document.createElement('li');
-      const countText = item.count === null ? '' : ` · 자료 건수 ${item.count}`;
-      li.textContent = `${item.method} ${item.path} → HTTP ${item.status}${countText}`;
+      li.textContent = `${item.method} ${item.path} → HTTP ${item.status} · 요청 ID ${item.requestId} · 확인 ${item.checkedAt}`;
       return li;
-    }) : [Object.assign(document.createElement('li'), { textContent:'아직 확인된 API 응답이 없습니다.' })]));
+    }) : [Object.assign(document.createElement('li'), { textContent:'실제 API 확인 기록 없음' })]));
   }
 
   async function loadOperations() {
@@ -277,7 +264,6 @@
 
   async function refreshDeviceStatus({ load = true } = {}) {
     const { response, data } = await jsonFetch('/api/device/status');
-    addApiObservation('GET', '/api/device/status', response, data);
     authenticated = response.ok && data?.authenticated === true;
     approved = authenticated && data?.approved === true;
     renderAccess();
@@ -290,7 +276,6 @@
   async function api(path, options = {}) {
     if (!authenticated || !approved) throw new Error('DEVICE_NOT_APPROVED');
     const { response, data } = await jsonFetch(path, options);
-    addApiObservation(options.method ?? 'GET', path, response, data);
     if (!response.ok) {
       if (response.status === 403 && data?.error === 'DEVICE_NOT_APPROVED') {
         approved = false;
@@ -431,7 +416,6 @@
     authenticated = false;
     approved = false;
     opsSummary = null;
-    apiObservations.length = 0;
     renderAccess();
   });
 
