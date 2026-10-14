@@ -1,0 +1,22 @@
+{
+  "schema": "aleph.xdr.known-cve.patterns.v1",
+  "cve": "CVE-2021-44228",
+  "mitre": "T1190",
+  "patterns": [
+    {
+      "name": "jndi-lookup-in-header",
+      "condition": "요청 머리글 값에 ${jndi:...} 형태의 원격 조회 구문이 포함된다.",
+      "evidence": "CVE-2021-44228 형태 요청은 머리글에 삽입된 JNDI 원격 조회 구문을 통해 외부 공개 애플리케이션의 취약점 악용을 시도할 수 있으며 MITRE ATT&CK T1190에 해당한다."
+    },
+    {
+      "name": "jndi-lookup-in-argument",
+      "condition": "URL 또는 요청 인자 값에 ${jndi:...} 형태의 원격 조회 구문이 포함된다.",
+      "evidence": "CVE-2021-44228 형태 요청은 URL·요청 인자에 삽입된 JNDI 원격 조회 구문을 통해 취약점 악용을 시도할 수 있으며 MITRE ATT&CK T1190에 해당한다."
+    },
+    {
+      "name": "known-cve-scan-trace",
+      "condition": "경보 설명에 알려진 취약점 점검 흔적과 CVE-2021-44228 형태 요청이 함께 나타난다.",
+      "evidence": "알려진 취약점 점검 흔적이 CVE-2021-44228 형태의 악용 신호와 함께 나타나면 외부 공개 애플리케이션 취약점 탐색·악용 시도로 볼 근거가 되며 MITRE ATT&CK T1190에 해당한다."
+    }
+  ]
+}
