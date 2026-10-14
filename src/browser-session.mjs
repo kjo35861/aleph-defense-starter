@@ -22,7 +22,7 @@ export function requestAuthorization(request) {
   const direct = request?.headers?.authorization;
   if (typeof direct === 'string' && BEARER.test(direct)) return direct;
   const token = cookies(request).get(SESSION_COOKIE);
-  return token ? \`Bearer \${token}\` : null;
+  return token ? `Bearer ${token}` : null;
 }
 
 export function requestAccessToken(request) {
@@ -32,20 +32,20 @@ export function requestAccessToken(request) {
 }
 
 export function sessionCookie(token) {
-  return \`\${SESSION_COOKIE}=\${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600\`;
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`;
 }
 
 export function clearSessionCookie() {
-  return \`\${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0\`;
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
 function signDeviceId(deviceId, secret) {
-  return createHmac('sha256', secret).update(\`byteback-device:\${deviceId}\`).digest('base64url');
+  return createHmac('sha256', secret).update(`byteback-device:${deviceId}`).digest('base64url');
 }
 
 export function deviceCookie(deviceId, secret) {
   const proof = signDeviceId(deviceId, secret);
-  return \`\${DEVICE_COOKIE}=\${encodeURIComponent(\`\${deviceId}.\${proof}\`)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000\`;
+  return `${DEVICE_COOKIE}=${encodeURIComponent(`${deviceId}.${proof}`)}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`;
 }
 
 export function readVerifiedDeviceId(request, secret) {
