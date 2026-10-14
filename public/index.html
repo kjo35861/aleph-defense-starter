@@ -1,5 +1,4 @@
 <!doctype html>
-<!-- Step 5: browser talks only to server functions for auth and note data. -->
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -40,26 +39,17 @@
 <main>
   <div class="eyebrow">BYTE BACK · 보호된 자료실</div>
   <h1>내 자료실</h1>
-  <p>로그인한 사용자는 자신의 메모 목록을 보고 메모를 추가·수정·삭제할 수 있습니다.</p>
+  <p>로그인 뒤 서버가 이 기기의 등록 상태를 확인한 경우에만 보호 자료를 표시합니다.</p>
 
   <section class="panel" aria-labelledby="app-status-title">
     <h2 id="app-status-title">앱 및 기기 상태</h2>
     <div class="status-grid">
-      <div class="status-card">
-        <strong>설치 상태</strong>
-        <span id="install-status">브라우저 설치 가능 여부를 확인하는 중입니다.</span>
-      </div>
-      <div class="status-card">
-        <strong>기기 승인 상태</strong>
-        <span id="device-status">설치 여부만으로 기기 승인을 판단하지 않습니다. 보호 요청 결과를 기다리는 중입니다.</span>
-      </div>
-      <div class="status-card">
-        <strong>네트워크 상태</strong>
-        <span id="network-status">연결 상태를 확인하는 중입니다.</span>
-      </div>
+      <div class="status-card"><strong>설치 상태</strong><span id="install-status">확인 중입니다.</span></div>
+      <div class="status-card"><strong>기기 승인 상태</strong><span id="device-status">서버 확인 전입니다.</span></div>
+      <div class="status-card"><strong>네트워크 상태</strong><span id="network-status">확인 중입니다.</span></div>
     </div>
     <div class="actions"><button id="install-button" type="button" hidden>앱 설치</button></div>
-    <p class="muted">설치형 웹앱은 화면 접근을 편하게 하는 기능일 뿐입니다. 로그인·기기 승인·자료 접근 정책을 대신하거나 우회하지 않습니다. 오프라인에서는 보호된 자료 요청을 사용할 수 없습니다.</p>
+    <p class="muted">앱 설치 여부는 기기 승인을 뜻하지 않습니다. 승인 상태는 서버의 등록 레코드로만 확인합니다.</p>
   </section>
 
   <section class="panel">
@@ -74,45 +64,60 @@
     <p id="auth-error" class="error" role="alert"></p>
   </section>
 
-  <section id="editor" class="panel" hidden>
-    <h2>메모 추가</h2>
-    <form id="note-form">
-      <label>제목<input id="note-title" maxlength="500" required></label>
-      <label>내용<textarea id="note-body" maxlength="5000" required></textarea></label>
-      <button type="submit">추가</button>
+  <section id="approval-panel" class="panel" hidden>
+    <h2>기기 승인</h2>
+    <p>이 기기는 아직 서버에 등록되지 않았습니다. 승인 요청 시 비밀번호를 다시 확인한 뒤 서버가 등록 레코드를 만듭니다.</p>
+    <form id="approval-form">
+      <label>비밀번호 재확인<input id="approval-password" type="password" autocomplete="current-password" required></label>
+      <button type="submit">기기 승인 요청</button>
     </form>
-    <p id="note-error" class="error" role="alert"></p>
+    <p id="approval-error" class="error" role="alert"></p>
   </section>
 
-  <ul id="notes" aria-live="polite"><li>로그인하면 자료를 불러옵니다.</li></ul>
+  <section id="protected-area" hidden>
+    <section id="editor" class="panel">
+      <h2>메모 추가</h2>
+      <form id="note-form">
+        <label>제목<input id="note-title" maxlength="500" required></label>
+        <label>내용<textarea id="note-body" maxlength="5000" required></textarea></label>
+        <button type="submit">추가</button>
+      </form>
+      <p id="note-error" class="error" role="alert"></p>
+    </section>
+    <ul id="notes" aria-live="polite"></ul>
+  </section>
 </main>
 
 <script type="module">
-
-  const status = document.querySelector('#auth-status');
   const installStatus = document.querySelector('#install-status');
   const deviceStatus = document.querySelector('#device-status');
   const networkStatus = document.querySelector('#network-status');
   const installButton = document.querySelector('#install-button');
+  const authStatus = document.querySelector('#auth-status');
   const authError = document.querySelector('#auth-error');
-  const noteError = document.querySelector('#note-error');
   const loginForm = document.querySelector('#login-form');
   const signupButton = document.querySelector('#signup-button');
   const logoutButton = document.querySelector('#logout-button');
-  const editor = document.querySelector('#editor');
+  const approvalPanel = document.querySelector('#approval-panel');
+  const approvalForm = document.querySelector('#approval-form');
+  const approvalPassword = document.querySelector('#approval-password');
+  const approvalError = document.querySelector('#approval-error');
+  const protectedArea = document.querySelector('#protected-area');
   const noteForm = document.querySelector('#note-form');
+  const noteError = document.querySelector('#note-error');
   const emailInput = document.querySelector('#email');
   const passwordInput = document.querySelector('#password');
   const titleInput = document.querySelector('#note-title');
   const bodyInput = document.querySelector('#note-body');
   const list = document.querySelector('#notes');
-  let session = null;
   let installPrompt = null;
+  let authenticated = false;
+  let approved = false;
 
   function renderNetworkStatus() {
     networkStatus.textContent = navigator.onLine
-      ? '온라인 · 보호 요청은 서버에서 다시 판정됩니다.'
-      : '오프라인 · 로그인과 메모 보호 요청을 사용할 수 없습니다.';
+      ? '온라인 · 보호 요청은 서버에서 확인합니다.'
+      : '오프라인 · 보호 자료는 표시하지 않습니다.';
   }
 
   function renderInstallStatus() {
@@ -121,78 +126,67 @@
     if (standalone) {
       installStatus.textContent = '설치된 앱 화면으로 실행 중입니다.';
       installButton.hidden = true;
-      return;
-    }
-    if (installPrompt) {
+    } else if (installPrompt) {
       installStatus.textContent = '이 브라우저에서 설치할 수 있습니다.';
       installButton.hidden = false;
-      return;
+    } else {
+      installStatus.textContent = '브라우저 메뉴에서 설치 가능 여부를 확인하세요.';
+      installButton.hidden = true;
     }
-    installStatus.textContent = '브라우저 메뉴에서 설치할 수 있는지 확인하세요.';
-    installButton.hidden = true;
   }
 
-  function markProtectedRequest(response) {
-    if (response.ok) {
-      deviceStatus.textContent = '최근 보호 요청: 허용됨. 설치 여부와는 별개이며, 기기 승인 자체는 보호 정책 판정 결과를 따릅니다.';
-      return;
+  function renderAccess() {
+    authStatus.textContent = authenticated ? '로그인됨' : '로그아웃 상태입니다.';
+    loginForm.hidden = authenticated;
+    logoutButton.hidden = !authenticated;
+    approvalPanel.hidden = !authenticated || approved;
+    protectedArea.hidden = !authenticated || !approved;
+
+    if (!authenticated) {
+      deviceStatus.textContent = '로그인 후 서버에서 등록 상태를 확인합니다.';
+      list.replaceChildren();
+    } else if (!approved) {
+      deviceStatus.textContent = '승인 전 · 보호 자료는 표시하지 않습니다.';
+      list.replaceChildren();
+    } else {
+      deviceStatus.textContent = '서버 확인 완료 · 등록된 기기입니다.';
     }
-    if ([401, 403, 404].includes(response.status)) {
-      deviceStatus.textContent = `최근 보호 요청: 거부됨 (HTTP ${response.status}). 설치 상태와 무관하게 기존 보호 규칙이 적용되었습니다.`;
-      return;
-    }
-    deviceStatus.textContent = `최근 보호 요청 결과: HTTP ${response.status}. 설치 여부로 기기 승인을 판단하지 않습니다.`;
   }
 
-  renderNetworkStatus();
-  renderInstallStatus();
-  window.addEventListener('online', renderNetworkStatus);
-  window.addEventListener('offline', renderNetworkStatus);
-  window.addEventListener('beforeinstallprompt', event => {
-    event.preventDefault();
-    installPrompt = event;
-    renderInstallStatus();
-  });
-  window.addEventListener('appinstalled', () => {
-    installPrompt = null;
-    renderInstallStatus();
-  });
-
-  installButton.addEventListener('click', async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    await installPrompt.userChoice.catch(() => null);
-    installPrompt = null;
-    renderInstallStatus();
-  });
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      networkStatus.textContent = '온라인 상태이지만 오프라인 안내 기능을 등록하지 못했습니다.';
-    });
-  }
-
-  const saved = sessionStorage.getItem('byteback_session');
-  if (saved) {
-    try { session = JSON.parse(saved); } catch { sessionStorage.removeItem('byteback_session'); }
-  }
-
-  async function api(path, options = {}) {
-    if (!session?.access_token) throw new Error('로그인이 필요합니다.');
+  async function jsonFetch(path, options = {}) {
     const response = await fetch(path, {
       ...options,
+      credentials: 'same-origin',
       cache: 'no-store',
       headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
         ...(options.headers ?? {}),
       },
     });
-    markProtectedRequest(response);
-    if (response.status === 204) return null;
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);
-    return payload;
+    if (response.status === 204) return { response, data: null };
+    const data = await response.json().catch(() => ({}));
+    return { response, data };
+  }
+
+  async function refreshDeviceStatus({ load = true } = {}) {
+    const { response, data } = await jsonFetch('/api/device/status');
+    authenticated = response.ok && data?.authenticated === true;
+    approved = authenticated && data?.approved === true;
+    renderAccess();
+    if (approved && load) await loadNotes();
+  }
+
+  async function api(path, options = {}) {
+    if (!authenticated || !approved) throw new Error('DEVICE_NOT_APPROVED');
+    const { response, data } = await jsonFetch(path, options);
+    if (!response.ok) {
+      if (response.status === 403 && data?.error === 'DEVICE_NOT_APPROVED') {
+        approved = false;
+        renderAccess();
+      }
+      throw new Error(data?.error ?? `HTTP ${response.status}`);
+    }
+    return data;
   }
 
   function noteItem(note) {
@@ -214,7 +208,6 @@
       if (nextTitle === null) return;
       const nextBody = prompt('내용', note.body);
       if (nextBody === null) return;
-      noteError.textContent = '';
       try {
         await api(`/api/notes/${encodeURIComponent(note.id)}`, {
           method: 'PUT',
@@ -226,7 +219,6 @@
 
     remove.addEventListener('click', async () => {
       if (!confirm('이 메모를 삭제할까요?')) return;
-      noteError.textContent = '';
       try {
         await api(`/api/notes/${encodeURIComponent(note.id)}`, { method: 'DELETE' });
         await loadNotes();
@@ -239,78 +231,94 @@
   }
 
   async function loadNotes() {
-    if (!session) {
-      list.replaceChildren(Object.assign(document.createElement('li'), { textContent:'로그인하면 자료를 불러옵니다.' }));
-      return;
-    }
+    if (!approved) return;
+    noteError.textContent = '';
     try {
       const notes = await api('/api/notes');
-      if (!Array.isArray(notes)) throw new Error('자료 형식이 맞지 않습니다.');
+      if (!Array.isArray(notes)) throw new Error('INVALID_NOTES');
       list.replaceChildren(...(notes.length ? notes.map(noteItem) : [
-        Object.assign(document.createElement('li'), { textContent:'아직 내 메모가 없습니다.' }),
+        Object.assign(document.createElement('li'), { textContent: '아직 내 메모가 없습니다.' }),
       ]));
     } catch (error) {
-      list.replaceChildren(Object.assign(document.createElement('li'), { textContent:`자료 읽기 실패: ${error.message}` }));
+      list.replaceChildren(Object.assign(document.createElement('li'), { textContent: `자료 읽기 실패: ${error.message}` }));
     }
   }
 
-  async function renderAuth(nextSession) {
-    session = nextSession;
-    const signedIn = Boolean(session?.user);
-    status.textContent = signedIn ? `로그인됨: ${session.user.email ?? '이메일 확인 불가'}` : '로그아웃 상태입니다.';
-    loginForm.hidden = signedIn;
-    logoutButton.hidden = !signedIn;
-    editor.hidden = !signedIn;
-    if (signedIn) passwordInput.value = '';
-    await loadNotes();
-  }
-
-  await renderAuth(session);
-
-  signupButton.addEventListener('click', async () => {
-    authError.textContent = '';
-    const response = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: emailInput.value.trim(), password: passwordInput.value }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      authError.textContent = `회원가입 실패: ${data.error ?? `HTTP ${response.status}`}`;
-      return;
-    }
-    if (data.accessToken) {
-      session = { access_token: data.accessToken, user: { email: data.email } };
-      sessionStorage.setItem('byteback_session', JSON.stringify(session));
-      await renderAuth(session);
-    } else {
-      authError.textContent = '회원가입 요청 완료. 이메일 확인이 필요하면 확인 후 로그인하세요.';
-    }
+  renderNetworkStatus();
+  renderInstallStatus();
+  renderAccess();
+  window.addEventListener('online', renderNetworkStatus);
+  window.addEventListener('offline', renderNetworkStatus);
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    installPrompt = event;
+    renderInstallStatus();
   });
+  window.addEventListener('appinstalled', () => {
+    installPrompt = null;
+    renderInstallStatus();
+  });
+
+  installButton.addEventListener('click', async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => null);
+    installPrompt = null;
+    renderInstallStatus();
+  });
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 
   loginForm.addEventListener('submit', async event => {
     event.preventDefault();
     authError.textContent = '';
-    const response = await fetch('/api/auth/login', {
+    const { response, data } = await jsonFetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: emailInput.value.trim(), password: passwordInput.value }),
     });
-    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      authError.textContent = `로그인 실패: ${data.error ?? `HTTP ${response.status}`}`;
+      authError.textContent = `로그인 실패: ${data?.error ?? `HTTP ${response.status}`}`;
       return;
     }
-    session = { access_token: data.accessToken, user: { email: data.email } };
-    sessionStorage.setItem('byteback_session', JSON.stringify(session));
-    await renderAuth(session);
+    passwordInput.value = '';
+    await refreshDeviceStatus();
+  });
+
+  signupButton.addEventListener('click', async () => {
+    authError.textContent = '';
+    const { response, data } = await jsonFetch('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ email: emailInput.value.trim(), password: passwordInput.value }),
+    });
+    if (!response.ok) {
+      authError.textContent = `회원가입 실패: ${data?.error ?? `HTTP ${response.status}`}`;
+      return;
+    }
+    passwordInput.value = '';
+    if (data?.authenticated) await refreshDeviceStatus();
+    else authError.textContent = '회원가입 요청 완료. 이메일 확인 후 로그인하세요.';
+  });
+
+  approvalForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    approvalError.textContent = '';
+    const { response, data } = await jsonFetch('/api/device/approve', {
+      method: 'POST',
+      body: JSON.stringify({ password: approvalPassword.value }),
+    });
+    approvalPassword.value = '';
+    if (!response.ok || data?.approved !== true) {
+      approvalError.textContent = `승인 실패: ${data?.error ?? `HTTP ${response.status}`}`;
+      return;
+    }
+    await refreshDeviceStatus();
   });
 
   logoutButton.addEventListener('click', async () => {
-    authError.textContent = '';
-    session = null;
-    sessionStorage.removeItem('byteback_session');
-    await renderAuth(null);
+    await jsonFetch('/api/auth/logout', { method: 'POST' });
+    authenticated = false;
+    approved = false;
+    renderAccess();
   });
 
   noteForm.addEventListener('submit', async event => {
@@ -326,6 +334,8 @@
       await loadNotes();
     } catch (error) { noteError.textContent = `추가 실패: ${error.message}`; }
   });
+
+  await refreshDeviceStatus();
 </script>
 </body>
 </html>
