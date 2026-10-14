@@ -44,9 +44,9 @@ function deviceReads(count, patch = {}) {
   }));
 }
 
-// Step 11 self-check: preserve the prior access/detection regression checks while the web app shell is added.
+// Step 12 self-check: preserve prior access/detection regressions while the operations room and measured retest table are added.
 export async function runAttackChecks(config) {
-  if (config.step !== 11) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
+  if (config.step !== 12) throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
 
   const registered = await decide({ ...baseRequest, requestId: 'self-check-registered-device' });
   const unregistered = await decide({
