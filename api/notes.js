@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 import { RESOURCE_IDS } from '../src/resource-id.mjs';
-import { approvedDevice, requestAuthorization } from '../../src/browser-session.mjs';
+import { approvedDevice, requestAuthorization } from '../src/browser-session.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../aleph.config.json', import.meta.url), 'utf8'));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
