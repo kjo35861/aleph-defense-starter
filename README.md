@@ -365,3 +365,12 @@ npm run retest:table -- --record S03-F01 "HTTP 401 UNAUTHORIZED" "req-stage3-noa
 다시 확인하려면 저장소 루트에서 `npm run xdr:run -- known-cve`를 실행한 뒤 `xdr/known-cve/result.json`의 `counts`와 정상 이벤트 `kc-17`~`kc-24`의 action을 확인합니다. 이 검사는 로컬 가상 경보 재실행 결과이며 운영 ALEPH SDP 엔진의 실제 차단 실측으로 간주하지 않습니다.
 
 기존 ZTNA 학생 판정기 `src/decider.mjs`의 규칙은 수정하지 않았습니다. `aleph.config.json`은 기존 12단계 설정, 배포 주소, 로그인 발급자, 허용 경로, 원본 자료 API 주소를 그대로 유지합니다.
+
+
+## 보너스 xdr-04 저장점 — 지속성 공격 탐지
+
+`xdr/fixtures/persistence.json`의 24개 가상 경보를 대상으로 MITRE ATT&CK T1543·T1053 근거의 서비스 등록, 예약 작업, 시작 항목 변경을 구분합니다. `xdr/persistence/decide.mjs`는 `unsigned-new-service`, `unfamiliar-scheduled-task`, `startup-folder-change` 패턴으로 판단만 수행합니다. `respond.mjs`와 `connect.mjs`는 확신도 0.85 이상인 `block` 후보만 만료 시각과 근거 경보 ID를 가진 거부 규칙으로 연결하며, `alert`와 `block`은 별도 로그에 남깁니다. 기존 ZTNA 학생 판정기 규칙은 변경하지 않았습니다.
+
+로컬 검증용 복사본에서 `npm run xdr:run -- persistence`를 재실행하여 **block 8 / alert 8 / record 8**을 확인했습니다. `ps-01`~`ps-08`은 block, `ps-09`~`ps-16`은 alert, 정상 이벤트 `ps-17`~`ps-24`는 record로서 정상 이벤트 오차단은 **0건**입니다. 해당 복사본은 Git 작업 트리가 아니므로 이 결과는 실제 배포나 운영 ALEPH SDP 엔진의 접속 차단 실측이 아닙니다. 저장소의 기존 result.json과 이 분류 결과를 대조했습니다.
+
+재현: 저장소 루트에서 `npm run xdr:run -- persistence`를 실행한 뒤 `xdr/persistence/result.json`의 `counts`와 정상 이벤트의 `action`을 확인합니다. 실행 중 만들어지는 `xdr/alerts.log` 및 `xdr/deny-rules.json`은 Git 추적에서 제외하며, 정상 이벤트가 새 거부 규칙을 만드는 경우는 없어야 합니다. 단계 설정은 기존 12단계를 유지하며 `judgeIssuer`, 배포·로그인·원본 API 설정, 허용 경로는 변경하지 않았습니다.
