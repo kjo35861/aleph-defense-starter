@@ -240,3 +240,5 @@ Supabase에는 `docs/DEVICE_APPROVAL.sql`을 한 번 적용해 `learning_devices
 설정은 `aleph.config.json`의 `step: 11`이며 기존 배포 주소, 로그인 발급자, 원본 자료 API 주소를 유지합니다. 새 허용 경로에는 `GET /api/device/status`, `POST /api/device/approve`, `POST /api/auth/logout`을 기록했습니다. 기존 `src/decider.mjs`의 `device_registered`, `step_up_required`, `resource_zone` 규칙은 변경하지 않았습니다.
 
 다시 확인할 때는 Supabase SQL Editor에서 `docs/DEVICE_APPROVAL.sql`을 적용한 뒤 최신 배포에서 로그인합니다. 승인 전에는 메모 목록과 편집기가 보이지 않아야 하고 직접 `GET /api/notes`를 호출해도 `403 DEVICE_NOT_APPROVED`여야 합니다. 비밀번호 재확인을 거쳐 서버 승인이 끝난 뒤에는 기존 자기 메모 화면과 CRUD가 정상 동작해야 합니다. 이 저장점 작성 시 실제 SQL 적용과 최신 배포 재시험은 **미실행**입니다.
+
+최종 코드 검수에서 브라우저 `sessionStorage`/`localStorage`에 인증 토큰이나 기기 키를 저장하지 않는 것, 승인 전 `protected-area`가 숨겨지는 것, 보호 API가 서버의 활성 기기 등록 레코드를 다시 확인하는 것을 소스 기준으로 대조했습니다. 실제 배포 동작은 최신 커밋 배포와 DB SQL 적용 뒤 다시 확인해야 합니다.
