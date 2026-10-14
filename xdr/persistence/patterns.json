@@ -1,0 +1,21 @@
+{
+  "schema": "aleph.xdr.persistence.patterns.v1",
+  "mitre": ["T1543", "T1053"],
+  "patterns": [
+    {
+      "name": "unsigned-new-service",
+      "condition": "새 서비스가 등록되거나 서비스 실행 파일이 바뀌었고, 서명이 없거나 임시 폴더의 실행 파일을 가리킨다.",
+      "evidence": "MITRE ATT&CK T1543은 시스템 프로세스 생성·변경을 통한 지속성 확보를 다루며, 서명 없는 새 서비스 등록이나 서비스 실행 파일 변경은 그 근거가 된다."
+    },
+    {
+      "name": "unfamiliar-scheduled-task",
+      "condition": "처음 보는 예약 작업이 만들어졌거나 예약 작업이 임시 폴더의 프로그램을 비정상적인 시각에 실행한다.",
+      "evidence": "MITRE ATT&CK T1053은 예약 작업·작업 스케줄러를 이용한 지속성을 다루며, 낯선 예약 작업과 비정상 실행 대상은 그 근거가 된다."
+    },
+    {
+      "name": "startup-folder-change",
+      "condition": "시작 폴더 또는 시작 프로그램 목록에 평소 없던 실행 항목이 새로 추가되거나 변경된다.",
+      "evidence": "MITRE ATT&CK T1543의 시스템 프로세스·서비스 변경 맥락에서 시작 시 자동 실행되도록 항목을 추가하는 변화는 지속성 확보 신호로 볼 근거가 된다."
+    }
+  ]
+}
