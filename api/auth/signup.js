@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { sessionCookie } from '../../src/browser-session.mjs';
 
 function parseBody(request) {
   if (request.body && typeof request.body === 'object') return request.body;
@@ -30,9 +31,12 @@ export default async function handler(request, response) {
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) return response.status(400).json({ error: error.message });
 
+  if (data?.session?.access_token) {
+    response.setHeader('Set-Cookie', sessionCookie(data.session.access_token));
+  }
   return response.status(200).json({
-    accessToken: data?.session?.access_token ?? null,
     email: data?.user?.email ?? email,
+    authenticated: Boolean(data?.session?.access_token),
     confirmationRequired: !data?.session,
   });
 }
