@@ -350,3 +350,18 @@ npm run retest:table -- --record S03-F01 "HTTP 401 UNAUTHORIZED" "req-stage3-noa
 심판의 `실행 기록 대조` 지적에 따라 `src/attack-check.mjs`의 9개 점검은 실제 요청 기록이 없는 상태에서 로컬 계산값을 결과처럼 쓰지 않고 모두 `observed: "not_run"`으로 남깁니다. 실제 요청을 보내고 그 요청 ID와 응답을 기록하기 전에는 실행된 점검으로 표시하지 않습니다.
 
 탈환 작전실도 로컬 XDR 자기점검 산출물을 실제 운영 API 실측으로 세지 않습니다. 실제 서버 탐지 기록이 없는 현재 상태에서는 탐지 수치가 0건이고 가린 서버 기록도 0건이며, 탐지·회수·복구 실행 상태는 `미실행`으로 구분합니다. `GET /api/ops/summary` 자체의 실제 응답만 서버가 생성한 요청 ID와 확인 시각을 포함한 `apiEvidence`로 표시합니다. 따라서 화면 수치와 가린 서버 기록은 같은 서버 응답을 기준으로 일치해야 합니다.
+
+
+## 보너스 xdr-03 저장점 — 알려진 취약점 악용 탐지
+
+`xdr/fixtures/known-cve.json`의 Wazuh 형태 가상 경보를 대상으로 CVE-2021-44228 형태 요청과 MITRE ATT&CK T1190 근거를 사용해 알려진 취약점 악용 여부를 판정합니다. 확인용 `read-alerts.mjs`는 시각·출발 주소·계정·규칙 수준·설명만 추출하고 비밀값처럼 보이는 문자열은 출력하지 않으며, `decide.mjs`에서는 이 읽기 모듈을 불러오지 않습니다.
+
+`patterns.json`에는 요청 머리글의 JNDI 원격 조회 구문, URL/요청 인자의 JNDI 원격 조회 구문, 알려진 취약점 점검 흔적과 CVE 형태가 함께 나타나는 경우의 세 패턴만 기록했습니다. `decide.mjs`는 이 패턴을 파일 상수로 포함하고 외부 파일·패키지·네트워크 없이 `decide(alert)`만 계산합니다. 확신도 0.85 이상은 `block`, 0.5 이상은 `alert`, 그 아래는 `record`입니다.
+
+`respond.mjs`는 `block`이면서 확신도 0.85 이상이고 known-cve 근거 패턴 및 유효한 출발 IP가 있는 경우에만 `xdr/deny-rules.json`에 15분 만료 거부 규칙을 기록합니다. 규칙에는 근거 경보 번호와 근거 패턴을 붙입니다. `alert`와 `block`은 `xdr/alerts.log`에 JSON 한 줄씩 누적하며, `record` 정상 이벤트는 새 거부 규칙을 만들지 않습니다. 두 실행 산출물은 Git에서 제외합니다.
+
+저장점 직전 `npm run xdr:run -- known-cve`를 다시 실행했습니다. `xdr/known-cve/result.json`의 결과는 총 24건에 대해 **block 8 / alert 4 / record 12**이며, 정상 이벤트 `kc-17`~`kc-24`는 모두 `record`로 판정되어 정상 이벤트의 block은 **0건**입니다. 명확한 공격 `kc-01`~`kc-08`은 모두 `block`입니다.
+
+다시 확인하려면 저장소 루트에서 `npm run xdr:run -- known-cve`를 실행한 뒤 `xdr/known-cve/result.json`의 `counts`와 정상 이벤트 `kc-17`~`kc-24`의 action을 확인합니다. 이 검사는 로컬 가상 경보 재실행 결과이며 운영 ALEPH SDP 엔진의 실제 차단 실측으로 간주하지 않습니다.
+
+기존 ZTNA 학생 판정기 `src/decider.mjs`의 규칙은 수정하지 않았습니다. `aleph.config.json`은 기존 12단계 설정, 배포 주소, 로그인 발급자, 허용 경로, 원본 자료 API 주소를 그대로 유지합니다.
