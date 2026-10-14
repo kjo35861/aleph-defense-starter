@@ -18,7 +18,8 @@
     "POST /api/notes/restore",
     "GET /api/device/status",
     "POST /api/device/approve",
-    "POST /api/auth/logout"
+    "POST /api/auth/logout",
+    "GET /api/ops/summary"
   ],
   "originalApiUrl": "https://vzyvadaspjwmovtaekdc.supabase.co/rest/v1/learning_notes",
   "restoreRoute": "POST /api/notes/restore"
