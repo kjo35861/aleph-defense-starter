@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import { createLoginVerifier } from '../../src/verify-login.mjs';
+import { approvedDevice, requestAuthorization } from '../../src/browser-session.mjs';
 import { RESOURCE_IDS } from '../../src/resource-id.mjs';
 
 const config = JSON.parse(readFileSync(new URL('../../aleph.config.json', import.meta.url), 'utf8'));
@@ -39,7 +40,7 @@ export default async function handler(request, response) {
   const secretKey = process.env.SUPABASE_SECRET_KEY;
   if (!url || !secretKey) return response.status(500).json({ error: 'SERVER_NOT_CONFIGURED' });
 
-  const verified = await verifier(secretKey)(request.headers.authorization);
+  const verified = await verifier(secretKey)(requestAuthorization(request));
   if (!verified?.userId) return response.status(401).json({ error: 'UNAUTHORIZED' });
 
   const payload = parseBody(request);
@@ -51,6 +52,9 @@ export default async function handler(request, response) {
   const supabase = createClient(url, secretKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const deviceApproved = await approvedDevice({ request, verified, supabase, secretKey });
+  if (!deviceApproved) return response.status(403).json({ error: 'DEVICE_NOT_APPROVED' });
 
   // DB 함수가 같은 트랜잭션 안에서 비공개 사본을 다시 읽어 잠그고,
   // ID·소유자·내용 해시 검증에 성공한 경우에만 지정한 한 건을 복원합니다.
