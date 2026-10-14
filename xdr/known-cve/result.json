@@ -64,15 +64,15 @@
     },
     {
       "alertId": "kc-11",
-      "action": "record",
-      "confidence": 0.1,
-      "reason": "no-matching-pattern"
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "known-cve-scan-trace"
     },
     {
       "alertId": "kc-12",
-      "action": "record",
-      "confidence": 0.1,
-      "reason": "no-matching-pattern"
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "jndi-lookup-in-header"
     },
     {
       "alertId": "kc-13",
@@ -82,21 +82,21 @@
     },
     {
       "alertId": "kc-14",
-      "action": "record",
-      "confidence": 0.1,
-      "reason": "no-matching-pattern"
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "known-cve-scan-trace"
     },
     {
       "alertId": "kc-15",
-      "action": "record",
-      "confidence": 0.1,
-      "reason": "no-matching-pattern"
+      "action": "alert",
+      "confidence": 0.5,
+      "reason": "jndi-lookup-in-argument"
     },
     {
       "alertId": "kc-16",
       "action": "alert",
       "confidence": 0.5,
-      "reason": "known-cve-scan-trace"
+      "reason": "jndi-lookup-in-argument"
     },
     {
       "alertId": "kc-17",
@@ -149,7 +149,7 @@
   ],
   "counts": {
     "block": 8,
-    "alert": 4,
-    "record": 12
+    "alert": 8,
+    "record": 8
   }
 }
