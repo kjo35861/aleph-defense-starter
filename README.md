@@ -223,14 +223,20 @@ Supabase의 `learning_notes.id`를 UUID로 맞추려면 `supabase/step3_notes_uu
 확인할 때는 최신 배포에서 앱 이름과 설치 안내가 보이는지 확인한 뒤, 기존 정상 보호 요청과 기존 거부 요청을 각각 다시 실행합니다. 이 기록 작성 시 해당 배포 재시험은 **미실행**입니다.
 
 
-## 11단계 저장점 — 설치형 웹앱과 기기 상태 표시
+## 11단계 저장점 — 설치형 웹앱과 서버 기기 승인
 
 현재 자료실은 `/manifest.webmanifest`, `/sw.js`, `/offline.html`, `/app-icon.svg`를 사용해 설치형 웹앱으로 실행할 수 있습니다. 서비스 워커는 정적 앱 화면과 오프라인 안내만 다루며 `/api/` 요청은 캐시하거나 대신 응답하지 않습니다.
 
-첫 화면은 설치 상태, 네트워크 상태, 최근 보호 요청 결과를 분리해서 보여 줍니다. 설치 가능/설치됨 표시는 브라우저 PWA 상태일 뿐이며 기기 승인을 뜻하지 않습니다. 기존 로그인·메모 API·소유자 검사·등록 기기 판정 규칙은 그대로 유지합니다.
+로그인 세션 토큰은 더 이상 `sessionStorage`나 `localStorage`에 저장하지 않고 서버가 설정한 `HttpOnly; Secure; SameSite=Strict` 쿠키로만 전달합니다. 브라우저 코드에는 기기 개인키나 기기 승인 비밀값을 두지 않습니다.
 
-현재 저장소의 `docs/DECIDER_REQUEST.md`에는 브라우저가 사용할 수 있는 공식 기기 승인 요청/등록 상태 조회 계약이 없습니다. 따라서 승인 버튼만으로 권한을 주거나 브라우저 저장소에 기기 키·승인 상태를 넣는 기능은 구현하지 않았습니다. 운영 엔진이 제공하는 공식 기기 승인 인터페이스가 추가되기 전까지 실제 승인 완료 흐름은 **미완료**입니다.
+기기 승인은 `GET /api/device/status`와 `POST /api/device/approve`로 처리합니다. 승인 요청은 로그인된 사용자가 비밀번호를 다시 확인해야 하며, 서버가 `learning_devices`에 사용자 소유의 기기 ID를 등록한 뒤 서명된 HttpOnly 기기 쿠키를 발급합니다. 승인 버튼 클릭만으로 자료 권한을 주지 않습니다.
 
-설정은 `aleph.config.json`의 `step: 11`이며 배포 주소, 로그인 발급자, 기존 허용 자료 API 경로, 원본 자료 API 주소는 10단계와 동일하게 유지합니다. `src/attack-check.mjs`는 11단계에서도 이전 등록 기기 허용/미등록 기기 거부, 복합 이상 추가 확인, 탐지 회귀를 그대로 자기점검합니다.
+`GET/POST /api/notes`, `GET/PUT/DELETE /api/notes/:id`, `POST /api/notes/restore`는 로그인 검증 뒤에도 서버가 현재 기기 ID의 활성 등록 레코드를 다시 확인합니다. 등록되지 않은 학생 기기는 `403 DEVICE_NOT_APPROVED`로 중단합니다. 운영 심판용 신뢰 토큰은 기존 검증 흐름을 유지합니다.
 
-다시 확인할 때는 `npm run build -- --local`로 설치형 화면 정적 파일을 확인하고, `npm run decider:test`와 `npm run detect:test`로 기존 판정·탐지 회귀를 확인합니다. 최신 배포에서는 정상 로그인/자기 메모 요청과 기존 금지 요청을 각각 다시 실행해야 하며, 이 저장점 작성 시 실제 11단계 배포 재시험은 **미실행**입니다.
+첫 화면은 승인 전 `protected-area` 전체를 숨기고 메모 API를 호출하지 않습니다. `/api/device/status`가 `approved: true`를 반환한 뒤에만 기존 메모 목록과 편집기를 표시합니다. 앱 설치 여부는 승인 근거로 사용하지 않습니다.
+
+Supabase에는 `docs/DEVICE_APPROVAL.sql`을 한 번 적용해 `learning_devices` 테이블을 준비해야 합니다. 이 테이블은 RLS를 켜고 `public`, `anon`, `authenticated`의 직접 권한을 회수하며 서버 전용 API만 읽고 씁니다. 실제 기기 개인키나 비밀번호는 저장하지 않습니다.
+
+설정은 `aleph.config.json`의 `step: 11`이며 기존 배포 주소, 로그인 발급자, 원본 자료 API 주소를 유지합니다. 새 허용 경로에는 `GET /api/device/status`, `POST /api/device/approve`, `POST /api/auth/logout`을 기록했습니다. 기존 `src/decider.mjs`의 `device_registered`, `step_up_required`, `resource_zone` 규칙은 변경하지 않았습니다.
+
+다시 확인할 때는 Supabase SQL Editor에서 `docs/DEVICE_APPROVAL.sql`을 적용한 뒤 최신 배포에서 로그인합니다. 승인 전에는 메모 목록과 편집기가 보이지 않아야 하고 직접 `GET /api/notes`를 호출해도 `403 DEVICE_NOT_APPROVED`여야 합니다. 비밀번호 재확인을 거쳐 서버 승인이 끝난 뒤에는 기존 자기 메모 화면과 CRUD가 정상 동작해야 합니다. 이 저장점 작성 시 실제 SQL 적용과 최신 배포 재시험은 **미실행**입니다.
