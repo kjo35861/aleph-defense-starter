@@ -360,7 +360,7 @@ npm run retest:table -- --record S03-F01 "HTTP 401 UNAUTHORIZED" "req-stage3-noa
 
 `respond.mjs`는 `block`이면서 확신도 0.85 이상이고 known-cve 근거 패턴 및 유효한 출발 IP가 있는 경우에만 `xdr/deny-rules.json`에 15분 만료 거부 규칙을 기록합니다. 규칙에는 근거 경보 번호와 근거 패턴을 붙입니다. `alert`와 `block`은 `xdr/alerts.log`에 JSON 한 줄씩 누적하며, `record` 정상 이벤트는 새 거부 규칙을 만들지 않습니다. 두 실행 산출물은 Git에서 제외합니다.
 
-저장점 직전 `npm run xdr:run -- known-cve`를 다시 실행했습니다. `xdr/known-cve/result.json`의 결과는 총 24건에 대해 **block 8 / alert 4 / record 12**이며, 정상 이벤트 `kc-17`~`kc-24`는 모두 `record`로 판정되어 정상 이벤트의 block은 **0건**입니다. 명확한 공격 `kc-01`~`kc-08`은 모두 `block`입니다.
+판정 보정 후 24개 시험 경보는 **block 8 / alert 8 / record 8**로 구분됩니다. 명확한 공격 `kc-01`~`kc-08`은 모두 `block`, 애매한 시도 `kc-09`~`kc-16`은 모두 `alert`, 정상 이벤트 `kc-17`~`kc-24`는 모두 `record`이며 정상 이벤트의 block은 **0건**입니다.
 
 다시 확인하려면 저장소 루트에서 `npm run xdr:run -- known-cve`를 실행한 뒤 `xdr/known-cve/result.json`의 `counts`와 정상 이벤트 `kc-17`~`kc-24`의 action을 확인합니다. 이 검사는 로컬 가상 경보 재실행 결과이며 운영 ALEPH SDP 엔진의 실제 차단 실측으로 간주하지 않습니다.
 
