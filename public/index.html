@@ -28,6 +28,11 @@
     .status-card strong { font-size:14px; color:#8ad8df; }
     .status-card span { display:block; margin-top:6px; color:#ecf4ff; line-height:1.5; }
     .muted { font-size:14px; color:#9fb3c9; }
+    .ops-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+    .ops-card { padding:14px; border:1px solid #51667c; border-radius:12px; background:#101d2d; }
+    .ops-card b { display:block; margin-top:8px; font-size:22px; }
+    .ops-log { max-height:320px; overflow:auto; padding:0; }
+    .ops-log li { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:13px; }
     [hidden] { display:none !important; }
     ul { list-style:none; display:grid; gap:12px; padding:0; }
     li { border:1px solid #51667c; border-radius:14px; padding:17px 19px; background:#1a2a3d; }
@@ -75,6 +80,26 @@
   </section>
 
   <section id="protected-area" hidden>
+    <section id="operations-room" class="panel" aria-labelledby="operations-title">
+      <h2 id="operations-title">탈환 작전실</h2>
+      <p class="muted">실제 API 응답에서 확인된 결과와 로컬/설정 기록, 미실행 항목을 구분합니다. 가상 메모 본문은 이 화면에 표시하지 않습니다.</p>
+      <div class="ops-grid">
+        <div class="ops-card"><span>판정기 규칙</span><b id="ops-rule-count">-</b><small id="ops-rule-source">확인 중</small></div>
+        <div class="ops-card"><span>탐지 사건</span><b id="ops-detection-count">-</b><small id="ops-detection-source">확인 중</small></div>
+        <div class="ops-card"><span>회수 상태</span><b id="ops-revocation">-</b><small id="ops-revocation-source">확인 중</small></div>
+        <div class="ops-card"><span>복구 버전</span><b id="ops-recovery">-</b><small id="ops-recovery-source">확인 중</small></div>
+      </div>
+      <p id="ops-breakdown" class="muted"></p>
+      <h3>실제 API 확인</h3>
+      <ul id="ops-api-observations" class="ops-log"><li>아직 확인된 API 응답이 없습니다.</li></ul>
+      <details>
+        <summary>가린 서버 기록</summary>
+        <p class="muted">사용자·기기·토큰·메모 제목·메모 본문 필드는 제외합니다.</p>
+        <ul id="ops-redacted-records" class="ops-log"></ul>
+      </details>
+      <p id="ops-error" class="error" role="alert"></p>
+    </section>
+
     <section id="editor" class="panel">
       <h2>메모 추가</h2>
       <form id="note-form">
@@ -110,9 +135,23 @@
   const titleInput = document.querySelector('#note-title');
   const bodyInput = document.querySelector('#note-body');
   const list = document.querySelector('#notes');
+  const opsRuleCount = document.querySelector('#ops-rule-count');
+  const opsRuleSource = document.querySelector('#ops-rule-source');
+  const opsDetectionCount = document.querySelector('#ops-detection-count');
+  const opsDetectionSource = document.querySelector('#ops-detection-source');
+  const opsRevocation = document.querySelector('#ops-revocation');
+  const opsRevocationSource = document.querySelector('#ops-revocation-source');
+  const opsRecovery = document.querySelector('#ops-recovery');
+  const opsRecoverySource = document.querySelector('#ops-recovery-source');
+  const opsBreakdown = document.querySelector('#ops-breakdown');
+  const opsApiObservations = document.querySelector('#ops-api-observations');
+  const opsRedactedRecords = document.querySelector('#ops-redacted-records');
+  const opsError = document.querySelector('#ops-error');
   let installPrompt = null;
   let authenticated = false;
   let approved = false;
+  let opsSummary = null;
+  const apiObservations = [];
 
   function renderNetworkStatus() {
     networkStatus.textContent = navigator.onLine
@@ -168,17 +207,90 @@
     return { response, data };
   }
 
+  function addApiObservation(method, path, response, data) {
+    const count = method === 'GET' && path === '/api/notes' && Array.isArray(data)
+      ? data.length
+      : null;
+    apiObservations.push({
+      method,
+      path,
+      status: response.status,
+      ok: response.ok,
+      count,
+      at: new Date().toISOString(),
+    });
+    if (apiObservations.length > 12) apiObservations.shift();
+    renderOperations();
+  }
+
+  function sourceLabel(value) {
+    if (value === 'server_code') return '서버 코드 확인';
+    if (value === 'local_self_check_artifact') return '로컬 자기점검 기록 · API 실측 아님';
+    if (value === 'verified_snapshot') return '검증 사본 · 복구 실행 여부 별도';
+    if (value === 'runtime') return '실행 상태';
+    return value ?? '미확인';
+  }
+
+  function renderOperations() {
+    if (!opsSummary) return;
+    const detection = opsSummary.detection;
+    const counts = detection?.counts ?? { total:0, block:0, alert:0, record:0 };
+
+    opsRuleCount.textContent = String(opsSummary.policy?.ruleCount ?? 0);
+    opsRuleSource.textContent = sourceLabel(opsSummary.policy?.source);
+    opsDetectionCount.textContent = String(counts.total ?? 0);
+    opsDetectionSource.textContent = sourceLabel(detection?.source);
+    opsRevocation.textContent = opsSummary.revocation?.status === 'not_run' ? '미실행' : '확인됨';
+    opsRevocationSource.textContent = opsSummary.revocation?.reason ?? sourceLabel(opsSummary.revocation?.source);
+    opsRecovery.textContent = String(opsSummary.recovery?.version ?? '-').slice(0, 12);
+    opsRecoverySource.textContent = opsSummary.recovery?.status === 'not_run'
+      ? `${sourceLabel(opsSummary.recovery?.source)} · 실제 복구 미실행`
+      : sourceLabel(opsSummary.recovery?.source);
+    opsBreakdown.textContent = `탐지 기록 합계 ${counts.total}건 · block ${counts.block} · alert ${counts.alert} · record ${counts.record}`;
+
+    const records = Array.isArray(detection?.records) ? detection.records : [];
+    opsRedactedRecords.replaceChildren(...records.map(record => {
+      const li = document.createElement('li');
+      li.textContent = `${record.alertId} · ${record.action} · ${record.reason} · 상세=[REDACTED]`;
+      return li;
+    }));
+
+    opsApiObservations.replaceChildren(...(apiObservations.length ? apiObservations.map(item => {
+      const li = document.createElement('li');
+      const countText = item.count === null ? '' : ` · 자료 건수 ${item.count}`;
+      li.textContent = `${item.method} ${item.path} → HTTP ${item.status}${countText}`;
+      return li;
+    }) : [Object.assign(document.createElement('li'), { textContent:'아직 확인된 API 응답이 없습니다.' })]));
+  }
+
+  async function loadOperations() {
+    opsError.textContent = '';
+    const { response, data } = await jsonFetch('/api/ops/summary');
+    if (!response.ok) {
+      opsSummary = null;
+      opsError.textContent = `작전실 읽기 실패: ${data?.error ?? `HTTP ${response.status}`}`;
+      return;
+    }
+    opsSummary = data;
+    renderOperations();
+  }
+
   async function refreshDeviceStatus({ load = true } = {}) {
     const { response, data } = await jsonFetch('/api/device/status');
+    addApiObservation('GET', '/api/device/status', response, data);
     authenticated = response.ok && data?.authenticated === true;
     approved = authenticated && data?.approved === true;
     renderAccess();
-    if (approved && load) await loadNotes();
+    if (approved && load) {
+      await loadOperations();
+      await loadNotes();
+    }
   }
 
   async function api(path, options = {}) {
     if (!authenticated || !approved) throw new Error('DEVICE_NOT_APPROVED');
     const { response, data } = await jsonFetch(path, options);
+    addApiObservation(options.method ?? 'GET', path, response, data);
     if (!response.ok) {
       if (response.status === 403 && data?.error === 'DEVICE_NOT_APPROVED') {
         approved = false;
@@ -318,6 +430,8 @@
     await jsonFetch('/api/auth/logout', { method: 'POST' });
     authenticated = false;
     approved = false;
+    opsSummary = null;
+    apiObservations.length = 0;
     renderAccess();
   });
 
