@@ -13,7 +13,8 @@
     "xdr:run": "node scripts/xdr-run.mjs",
     "policy:diff": "node scripts/policy-diff.mjs",
     "policy:restore": "node scripts/policy-restore.mjs",
-    "test:recovery": "node --test test/recovery-stage10.test.mjs"
+    "test:recovery": "node --test test/recovery-stage10.test.mjs",
+    "retest:table": "node scripts/retest-table.mjs"
   },
   "engines": {
     "node": ">=22"
