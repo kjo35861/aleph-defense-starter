@@ -374,3 +374,12 @@ npm run retest:table -- --record S03-F01 "HTTP 401 UNAUTHORIZED" "req-stage3-noa
 로컬 검증용 복사본에서 `npm run xdr:run -- persistence`를 재실행하여 **block 8 / alert 8 / record 8**을 확인했습니다. `ps-01`~`ps-08`은 block, `ps-09`~`ps-16`은 alert, 정상 이벤트 `ps-17`~`ps-24`는 record로서 정상 이벤트 오차단은 **0건**입니다. 해당 복사본은 Git 작업 트리가 아니므로 이 결과는 실제 배포나 운영 ALEPH SDP 엔진의 접속 차단 실측이 아닙니다. 저장소의 기존 result.json과 이 분류 결과를 대조했습니다.
 
 재현: 저장소 루트에서 `npm run xdr:run -- persistence`를 실행한 뒤 `xdr/persistence/result.json`의 `counts`와 정상 이벤트의 `action`을 확인합니다. 실행 중 만들어지는 `xdr/alerts.log` 및 `xdr/deny-rules.json`은 Git 추적에서 제외하며, 정상 이벤트가 새 거부 규칙을 만드는 경우는 없어야 합니다. 단계 설정은 기존 12단계를 유지하며 `judgeIssuer`, 배포·로그인·원본 API 설정, 허용 경로는 변경하지 않았습니다.
+
+
+## 보너스 xdr-05 저장점 — 권한 상승·정상 계정 악용 탐지
+
+`xdr/privilege/decide.mjs`는 MITRE ATT&CK T1068·T1078 관련 관리자 그룹 추가, 낯선 관리자 명령, 업무 시간 밖 권한 사용 신호를 분석하고 `block`/`alert`/`record`를 반환합니다. `respond.mjs` 및 `connect.mjs`는 확신도 0.85 이상의 차단 후보에만 15분 만료 시각과 근거 경보 ID를 가진 XDR 거부 규칙을 기록하고, block·alert 알림을 로그에 남깁니다. 기존 ZTNA 학생 판정기 규칙은 변경하지 않습니다.
+
+GitHub의 `xdr/privilege/result.json`에 기록된 26건은 **block 9 / alert 8 / record 9**이며 정상 이벤트 `pv-18`~`pv-26` 중 block은 **0건**입니다. 이 저장점의 원격 결과 파일을 검증했지만, 이번 작업 환경에서는 GitHub DNS 조회 오류로 저장소를 복제하지 못하여 `npm run xdr:run -- privilege`를 직접 재실행하지 않았습니다. 이전에 기록된 결과는 운영 ZTNA 엔진의 실차단 증빙이 아닙니다.
+
+재실행: 저장소 루트에서 `npm run xdr:run -- privilege`를 실행하고 `xdr/privilege/result.json`의 counts, 정상 경보 `pv-18`~`pv-26`의 action, `xdr/deny-rules.json`의 근거 경보 ID·만료 시각을 확인합니다. `xdr/alerts.log` 및 `xdr/deny-rules.json`은 Git에 커밋하지 않습니다. `aleph.config.json`의 단계·배포 주소·로그인 발급자·허용 경로·원본 API 주소·judgeIssuer는 변경하지 않습니다.
