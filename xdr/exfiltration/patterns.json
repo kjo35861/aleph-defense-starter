@@ -1,0 +1,24 @@
+{
+  "schema": "aleph.xdr.exfiltration.patterns.v1",
+  "mitre": [
+    "T1041",
+    "T1048"
+  ],
+  "patterns": [
+    {
+      "name": "unfamiliar-destination-bulk-transfer",
+      "condition": "처음 보는 외부 목적지로 자료 묶음·대용량 파일이 짧은 시간에 전송되거나 동일 목적지로 대량 전송이 반복된다.",
+      "evidence": "MITRE ATT&CK T1041·T1048은 외부로 자료를 유출하는 전송을 다루며, 낯선 목적지와 비정상 대량 전송의 결합은 유출 의심 신호다."
+    },
+    {
+      "name": "out-of-hours-archive-transfer",
+      "condition": "업무·수업 시간 밖에 압축 파일이 평소 쓰지 않는 외부 주소로 전송되거나 압축 파일 여러 개가 연속 반출된다.",
+      "evidence": "MITRE ATT&CK T1048은 명령 통로 이외 경로로 자료를 반출하는 행위를 다루며, 비정상 시각의 압축 파일 외부 전송은 확인할 만한 정황이다."
+    },
+    {
+      "name": "command-channel-repeated-exfiltration",
+      "condition": "경보에서 명령 통로를 통한 파일 전송이 명시되고 큰 파일 또는 자료 묶음이 외부 목적지로 반복 전송된다.",
+      "evidence": "MITRE ATT&CK T1041은 명령·제어 통신 통로를 이용한 정보 유출 기법으로, 해당 통로에서 확인된 반복 파일 전송이 직접적인 조사 근거다."
+    }
+  ]
+}
