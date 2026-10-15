@@ -383,3 +383,12 @@ npm run retest:table -- --record S03-F01 "HTTP 401 UNAUTHORIZED" "req-stage3-noa
 GitHub의 `xdr/privilege/result.json`에 기록된 26건은 **block 9 / alert 8 / record 9**이며 정상 이벤트 `pv-18`~`pv-26` 중 block은 **0건**입니다. 이 저장점의 원격 결과 파일을 검증했지만, 이번 작업 환경에서는 GitHub DNS 조회 오류로 저장소를 복제하지 못하여 `npm run xdr:run -- privilege`를 직접 재실행하지 않았습니다. 이전에 기록된 결과는 운영 ZTNA 엔진의 실차단 증빙이 아닙니다.
 
 재실행: 저장소 루트에서 `npm run xdr:run -- privilege`를 실행하고 `xdr/privilege/result.json`의 counts, 정상 경보 `pv-18`~`pv-26`의 action, `xdr/deny-rules.json`의 근거 경보 ID·만료 시각을 확인합니다. `xdr/alerts.log` 및 `xdr/deny-rules.json`은 Git에 커밋하지 않습니다. `aleph.config.json`의 단계·배포 주소·로그인 발급자·허용 경로·원본 API 주소·judgeIssuer는 변경하지 않습니다.
+
+
+## 보너스 xdr-06 저장점 — 정보 유출 탐지
+
+MITRE ATT&CK T1041·T1048 근거로 `xdr/fixtures/exfiltration.json`의 30건을 평가합니다. `decide.mjs`는 낯선 목적지 대량 전송, 업무 시간 외 압축 파일 전송, 명령 통로 반복 전송을 판단합니다. `respond.mjs`와 `connect.mjs`는 확신도 0.85 이상인 차단 후보의 유효 출발 IP만 15분 만료 규칙으로 기록하며 근거 경보 번호를 남깁니다. `block`과 `alert`는 `xdr/alerts.log`에 누적하고 정상 `record`는 새 차단 규칙을 만들지 않습니다.
+
+이번 확인에서는 원격 fixture와 현재 판정 조건을 독립적으로 계산해 **block 10 / alert 10 / record 10**, 정상 `ex-21`~`ex-30`의 block **0건**을 확인했습니다. **GitHub 저장소 복제 단계에서 DNS 오류가 발생해 `npm run xdr:run -- exfiltration` 자체는 직접 재실행하지 못했습니다.** 따라서 이 값은 실행 성공이나 실제 운영 ZTNA 차단 증빙이 아닙니다.
+
+재검증: 저장소 루트에서 `npm run xdr:run -- exfiltration`을 실행하고 `xdr/exfiltration/result.json`의 `counts`와 정상 경보 action을 확인합니다. `xdr/deny-rules.json`과 `xdr/alerts.log`는 Git에 커밋하지 않습니다. 기존 ZTNA 판정기, 단계 설정, 배포 주소, 로그인 발급자, 허용 경로, 원본 API 주소 및 `judgeIssuer`는 변경하지 않았습니다.
