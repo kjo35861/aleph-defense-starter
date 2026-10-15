@@ -1,0 +1,24 @@
+{
+  "schema": "aleph.xdr.privilege.patterns.v1",
+  "mitre": [
+    "T1068",
+    "T1078"
+  ],
+  "patterns": [
+    {
+      "name": "unexpected-admin-group-addition",
+      "condition": "일반 계정이 관리자 그룹에 새로 추가되거나 여러 계정이 단시간에 관리자 그룹에 추가되며 승인된 변경이라는 근거가 없다.",
+      "evidence": "MITRE ATT&CK T1078은 정상 계정의 악용으로 권한을 확대하는 행위를 다루며, 예상하지 못한 관리자 그룹 편입은 계정 권한 남용을 조사할 신호다."
+    },
+    {
+      "name": "unfamiliar-admin-command",
+      "condition": "기존과 다른 출발 주소·계정 권한으로 관리자 명령이 실행되거나 관리자 권한 변경 직후 관리자 명령이 실행된다.",
+      "evidence": "MITRE ATT&CK T1078은 탈취·오용된 정상 계정의 권한 사용을 다루며, 낯선 관리자 명령은 그 의심 신호다; T1068에 해당하려면 취약점 악용 증거가 추가로 필요하다."
+    },
+    {
+      "name": "out-of-hours-privilege-use",
+      "condition": "수업·업무 시간 밖에 관리자 권한이 사용되고 처음 보는 주소 또는 관리자 그룹 변경·명령 실행 같은 이상 징후가 함께 관찰된다.",
+      "evidence": "MITRE ATT&CK T1078의 탐지 근거에는 비정상 시간·출발지의 계정 사용이 포함되며, T1068은 별도 취약점 악용 정황이 있을 때만 연결한다."
+    }
+  ]
+}
