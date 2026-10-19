@@ -50,9 +50,9 @@ export function createStudentView() {
         line(group, '사용자 ID', data?.user?.id);
         line(group, '현재 기기 이름', data?.device?.label);
         line(group, '현재 기기 ID', data?.device?.id);
-        line(group, '현재 기기 보안 상태', deviceLabels[data?.device?.status] ?? '확인 불가');
+        line(group, '현재 기기 보안 상태', (deviceLabels[data?.device?.status] ?? '확인 불가') + ' (' + (data?.device?.status ?? 'unknown') + ')');
         line(group, '현재 세션 ID', data?.session?.id);
-        line(group, '현재 세션 상태', sessionLabels[data?.session?.status] ?? '확인 불가');
+        line(group, '현재 세션 상태', (sessionLabels[data?.session?.status] ?? '확인 불가') + ' (' + (data?.session?.status ?? 'unknown') + ')');
       });
 
       section('기기 목록', devices, (group, data) => {
@@ -65,7 +65,7 @@ export function createStudentView() {
           const item = document.createElement('div');
           line(item, '기기 이름', device?.label);
           line(item, '기기 ID', device?.id);
-          line(item, '보안 상태', deviceLabels[device?.status] ?? '확인 불가');
+          line(item, '보안 상태', (deviceLabels[device?.status] ?? '확인 불가') + ' (' + (device?.status ?? 'unknown') + ')');
           group.appendChild(item);
         }
       });
@@ -79,7 +79,7 @@ export function createStudentView() {
         for (const session of data) {
           const item = document.createElement('div');
           line(item, '세션 ID', session?.id);
-          line(item, '세션 상태', sessionLabels[session?.status] ?? '확인 불가');
+          line(item, '세션 상태', (sessionLabels[session?.status] ?? '확인 불가') + ' (' + (session?.status ?? 'unknown') + ')');
           group.appendChild(item);
         }
       });
